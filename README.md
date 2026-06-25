@@ -34,14 +34,6 @@ Drop a pin anywhere on the Navi Mumbai map and get **instant, data-backed intell
 
 ---
 
-## 🖥️ Screenshots
-
-> Drop a pin → instantly see all 5 cards populate with live data
-
-The app features a **premium light mode** with a blue-lavender gradient glow, white cards on a soft gray background, and a clean green primary accent.
-
----
-
 ## 🛠️ Tech Stack
 
 ### Frontend
