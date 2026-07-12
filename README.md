@@ -2,6 +2,7 @@
 
 AI-powered neighbourhood intelligence for property buyers and renters. Drop a pin anywhere in the world to get a complete analysis including nearby amenities, disaster risk, air quality, an AI-generated vibe report, and a conversational property assistant.
 
+
 ## ✨ Features
 
 - 🗺️ **Interactive Map** — Drop a pin anywhere to analyse a neighbourhood
@@ -111,10 +112,6 @@ npm install
 npm run dev
 # Runs on http://localhost:3000
 ```
-
-## 📄 License
-
-MIT
 
 ## 🔗 Links
 
