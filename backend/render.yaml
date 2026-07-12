@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: habitatmatch-backend
+    env: python
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: >
+      gunicorn --bind 0.0.0.0:5000
+      --workers 2 --timeout 120 app:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.11.0
