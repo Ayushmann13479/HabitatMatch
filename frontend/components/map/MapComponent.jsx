@@ -40,11 +40,34 @@ export default function MapComponent({
   activeCategories = [],
   center = { lat: 20, lng: 0 },
   zoom = 3,
+  selectedLocation = null,
 }) {
   const mapRef         = useRef(null)
   const mapInstanceRef = useRef(null)
   const activePinRef   = useRef(null)
   const placesLayerRef = useRef(null)
+
+  // ── Fly to selectedLocation when it changes (search-bar or autoload) ──
+  useEffect(() => {
+    if (!mapInstanceRef.current || !selectedLocation) return
+
+    const { lat, lng, address } = selectedLocation
+    if (typeof lat !== 'number' || typeof lng !== 'number') return
+
+    mapInstanceRef.current.flyTo([lat, lng], 15, { animate: true, duration: 1 })
+
+    // Remove previous pin
+    if (activePinRef.current) {
+      mapInstanceRef.current.removeLayer(activePinRef.current)
+    }
+
+    // Drop a new red pin at the selected location
+    const marker = L.marker([lat, lng], { icon: RED_MARKER }).addTo(mapInstanceRef.current)
+    if (address) {
+      marker.bindPopup(`<p style="font-size:12px;color:#4B5563">${address}</p>`)
+    }
+    activePinRef.current = marker
+  }, [selectedLocation])
 
   // ── Initialise map on mount ──────────────────────────────────────────
   useEffect(() => {

@@ -269,6 +269,7 @@ function MapContent() {
           onLocationSelect={handleAnalyse}
           places={places}
           activeCategories={activeCategories}
+          selectedLocation={selectedLocation}
           autoloadLat={searchParams.get('lat') ? parseFloat(searchParams.get('lat')) : null}
           autoloadLng={searchParams.get('lng') ? parseFloat(searchParams.get('lng')) : null}
         />
