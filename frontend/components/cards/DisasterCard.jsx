@@ -35,9 +35,9 @@ function ErrorCard({ message, onRetry }) {
 }
 
 const RISK_CONFIG = {
-  Low:    { badge: 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800', icon: '✅', bar: 'bg-emerald-500' },
-  Medium: { badge: 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800',   icon: '⚠️',  bar: 'bg-amber-500'   },
-  High:   { badge: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-300 dark:border-red-800',               icon: '🔴',  bar: 'bg-red-500'     },
+  Low:    { badge: 'bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700', label: 'Low flood exposure',      bar: 'bg-slate-400' },
+  Medium: { badge: 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800', label: 'Moderate flood exposure',  bar: 'bg-amber-400' },
+  High:   { badge: 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800', label: 'Elevated flood exposure', bar: 'bg-orange-400' },
 }
 
 export default function DisasterCard({ data, loading, error, onRetry }) {
@@ -51,13 +51,13 @@ export default function DisasterCard({ data, loading, error, onRetry }) {
     <div className="bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-2xl p-5 shadow-sm flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <span className="text-lg">🌊</span>
-        <h3 className="text-base font-semibold text-[var(--text-primary)]">Disaster Risk</h3>
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">Flood Exposure</h3>
       </div>
 
       {/* Risk badge */}
       <div className="flex justify-center">
-        <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold border ${config.badge}`}>
-          {config.icon} {data.overall_risk} Risk
+        <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border ${config.badge}`}>
+          {config.label}
         </span>
       </div>
 
@@ -78,12 +78,18 @@ export default function DisasterCard({ data, loading, error, onRetry }) {
         {data.risk_summary}
       </p>
 
-      {/* Flood zone warning */}
+      {/* Flood zone info line (neutral, not alarming) */}
       {data.in_flood_zone && (
-        <div className="flex items-center justify-center gap-2 p-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl text-red-700 dark:text-red-400 text-xs font-semibold">
-          ⚠️ This location is in a flood risk zone
+        <div className="flex items-start gap-2 p-2.5 bg-[var(--bg-subtle)] border border-[var(--hm-border)] rounded-xl text-[var(--text-secondary)] text-xs leading-relaxed">
+          <span className="shrink-0 mt-0.5">ℹ️</span>
+          <span>Low elevation relative to nearby coastline — consider flood insurance and drainage when evaluating this property.</span>
         </div>
       )}
+
+      {/* Disclaimer */}
+      <p className="text-[10px] text-[var(--text-tertiary)] text-center leading-snug">
+        Based on elevation and coastal proximity — not an official flood zone designation.
+      </p>
     </div>
   )
 }

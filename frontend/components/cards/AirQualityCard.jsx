@@ -102,21 +102,29 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
         </span>
       </div>
 
-      {/* Month grid */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="p-2 border border-[var(--hm-border)] rounded-xl text-center bg-[var(--bg-subtle)]">
-          <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Best Month</p>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">{data.best_month || '—'}</p>
+      {/* Pollutant breakdown */}
+      {data.pollutants && (
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { key: 'pm2_5', label: 'PM2.5' },
+            { key: 'pm10',  label: 'PM10'  },
+            { key: 'no2',   label: 'NO₂'   },
+            { key: 'o3',    label: 'O₃'    },
+          ].map(({ key, label }) => (
+            <div key={key} className="p-2 border border-[var(--hm-border)] rounded-xl text-center bg-[var(--bg-subtle)]">
+              <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">
+                {data.pollutants[key] != null ? data.pollutants[key] : '—'}
+              </p>
+              <p className="text-[9px] text-[var(--text-tertiary)]">µg/m³</p>
+            </div>
+          ))}
         </div>
-        <div className="p-2 border border-[var(--hm-border)] rounded-xl text-center bg-[var(--bg-subtle)]">
-          <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Worst Month</p>
-          <p className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">{data.worst_month || '—'}</p>
-        </div>
-      </div>
+      )}
 
-      {/* Station */}
-      <p className="text-[11px] text-[var(--text-tertiary)] text-center truncate" title={data.station_name}>
-        📡 {data.station_name}
+      {/* Source */}
+      <p className="text-[11px] text-[var(--text-tertiary)] text-center truncate">
+        📡 {data.station_name || 'OpenWeatherMap'}
       </p>
     </div>
   )

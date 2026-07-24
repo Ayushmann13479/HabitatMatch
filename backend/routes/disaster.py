@@ -127,13 +127,13 @@ def get_disaster_data(lat: float, lng: float, wait_for_cache: bool = False) -> d
     # 4. Risk level
     if elevation < 5 or in_flood_zone:
         risk, risk_colour, risk_cap = "high",   "red",    "High"
-        risk_summary = "High flood risk area. Significant risk during monsoon season."
+        risk_summary = "Low elevation relative to sea level. Historically higher rainfall accumulation in monsoon months (June–Sept). Consider flood insurance and drainage when evaluating."
     elif elevation <= 15 or coastal_distance < 3:
         risk, risk_colour, risk_cap = "medium", "yellow", "Medium"
-        risk_summary = "Moderate risk area. Exercise caution during heavy monsoon."
+        risk_summary = "Moderate elevation with some coastal proximity. Seasonal rainfall may be a factor — drainage infrastructure worth reviewing."
     else:
         risk, risk_colour, risk_cap = "low",    "green",  "Low"
-        risk_summary = "Low risk area. Generally safe from flooding."
+        risk_summary = "Higher elevation and adequate distance from coastline. Historically low flood exposure for this area."
 
     data = {
         "flood_risk":            risk,

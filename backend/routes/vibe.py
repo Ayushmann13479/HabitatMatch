@@ -79,11 +79,12 @@ In flood zone: {disaster.get('in_flood_zone', False)}
 Zone name: {disaster.get('flood_zone_name', 'None')}
 
 AIR QUALITY:
-Annual average AQI: {aqi.get('annual_avg_aqi', 95)}
-PM2.5: {aqi.get('annual_avg_pm25', 38.0)} μg/m³
-Rating: {aqi.get('rating', 'Moderate')}
-Worst month: {aqi.get('worst_month', 'December')}
-Best month: {aqi.get('best_month', 'July')}
+AQI (US scale): {aqi.get('aqi_current', 'N/A') if aqi else 'Unavailable'}
+PM2.5: {aqi.get('annual_avg_pm25', 'N/A') if aqi else 'N/A'} μg/m³
+Rating: {aqi.get('rating', 'N/A') if aqi else 'N/A'}
+PM10: {aqi.get('pollutants', {}).get('pm10', 'N/A') if aqi else 'N/A'} μg/m³
+NO2: {aqi.get('pollutants', {}).get('no2', 'N/A') if aqi else 'N/A'} μg/m³
+O3: {aqi.get('pollutants', {}).get('o3', 'N/A') if aqi else 'N/A'} μg/m³
 """
 
     prompt = f"""

@@ -73,11 +73,10 @@ def _build_context(address, lat, lng, nearby, disaster, aqi, vibe, score) -> str
     flood_zone_name  = disaster.get("flood_zone_name", "")            if disaster else ""
 
     # Air quality raw figures only — no category sentences
-    aqi_val  = aqi.get("aqi_current",    aqi.get("annual_avg_aqi", "N/A")) if aqi else "N/A"
-    aqi_rtg  = aqi.get("aqi_rating",     aqi.get("rating", "N/A"))         if aqi else "N/A"
-    pm25     = aqi.get("annual_avg_pm25", "N/A")                            if aqi else "N/A"
-    worst_mo = aqi.get("worst_month",    "N/A")                             if aqi else "N/A"
-    best_mo  = aqi.get("best_month",     "N/A")                             if aqi else "N/A"
+    aqi_val  = aqi.get("aqi_current",    "N/A")            if aqi else "N/A"
+    aqi_rtg  = aqi.get("aqi_rating",     aqi.get("rating", "N/A")) if aqi else "N/A"
+    pm25     = aqi.get("annual_avg_pm25", "N/A")            if aqi else "N/A"
+    pollutants = aqi.get("pollutants", {})                   if aqi else {}
 
     return f"""property_address: {address}
 coordinates: {round(lat, 5)}, {round(lng, 5)}
@@ -101,9 +100,10 @@ in_named_flood_zone: {in_flood_zone}{f' ({flood_zone_name})' if in_flood_zone an
 [air_quality]
 aqi_current: {aqi_val}
 aqi_category: {aqi_rtg}
-pm2_5_annual_avg_ug_m3: {pm25}
-worst_month: {worst_mo}
-best_month: {best_mo}
+pm2_5_ug_m3: {pm25}
+pm10_ug_m3: {pollutants.get('pm10', 'N/A')}
+no2_ug_m3: {pollutants.get('no2', 'N/A')}
+o3_ug_m3: {pollutants.get('o3', 'N/A')}
 
 [neighbourhood_vibe]
 vibe_tag: {vibe_tag}

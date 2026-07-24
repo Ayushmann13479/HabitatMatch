@@ -1,39 +1,29 @@
 """
-routes/airquality.py — Real-time AQI via OpenAQ API.
+routes/airquality.py — Real-time AQI via OpenWeatherMap Air Pollution API.
 
 GET /api/airquality?lat=&lng=
 """
 
-from collections import defaultdict
-
 import requests
 from flask import Blueprint, jsonify, request
 
-from config import OPENAQ_API_KEY
+from config import OPENWEATHER_API_KEY
 from utils.cache import CACHE_TTL_AIRQUALITY, get_cache, set_cache
 
 airquality_bp = Blueprint("airquality", __name__)
 
-OPENAQ_HEADERS = {"X-API-Key": OPENAQ_API_KEY}
+OPENWEATHER_AQI_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 
-MONTH_NAMES = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-]
+# ── European AQI (1-5) → HabitatScore (0-100) ────────────────────────────────
+AQI_SCORE_MAP = {1: 95, 2: 80, 3: 60, 4: 35, 5: 15}
 
-# ── Regional fallback ─────────────────────────────────────────────────────────
-FALLBACK = {
-    "aqi_current":      95,
-    "annual_avg_aqi":   95,
-    "annual_avg_pm25":  38.0,
-    "aqi_rating":       "Moderate",
-    "rating":           "Moderate",
-    "worst_month":      "December",
-    "best_month":       "July",
-    "station_name":     "Estimated - Regional Average",
-    "distance_km":      0,
-    "is_fallback":      True,
-    "aqi_colour":       "yellow",
+# ── European AQI (1-5) → human-readable label ────────────────────────────────
+AQI_LABEL_MAP = {
+    1: "Good",
+    2: "Fair",
+    3: "Moderate",
+    4: "Poor",
+    5: "Very Poor",
 }
 
 
@@ -68,20 +58,15 @@ def aqi_colour(aqi: int) -> str:
     return "red"
 
 
-def haversine_km(lat1, lng1, lat2, lng2) -> float:
-    import math
-    R = 6371
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lng2 - lng1)
-    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-    return R * 2 * math.asin(math.sqrt(a))
-
-
 # ── Pure data function (reusable internally) ──────────────────────────────────
-def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) -> dict:
-    """Core AQI logic — returns data dict (always succeeds; uses fallbacks)."""
-    cache_key = f"airquality:{round(lat,4)}:{round(lng,4)}"
+def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) -> dict | None:
+    """
+    Core AQI logic — returns data dict or None on genuine failure.
+    No hardcoded fallback: if the API fails, callers get None.
+    """
+    cache_key = f"airquality:{round(lat, 4)}:{round(lng, 4)}"
 
+    # wait_for_cache: poll for a cached result (used by score/vibe)
     if wait_for_cache:
         import time
         for _ in range(15):
@@ -89,7 +74,7 @@ def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) ->
             if cached:
                 return cached
             time.sleep(1)
-        return FALLBACK
+        return None
 
     cached = get_cache(cache_key)
     if cached:
@@ -97,142 +82,71 @@ def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) ->
         return cached
 
     try:
-        # 1. Find nearest station
-        print(f"[AQ] Searching for stations near {lat},{lng}")
-        loc_resp = requests.get(
-            "https://api.openaq.org/v3/locations",
-            headers=OPENAQ_HEADERS,
-            params={"coordinates": f"{lat},{lng}", "radius": 25000, "limit": 5},
+        print(f"[AQ] Fetching OpenWeatherMap Air Pollution for {lat},{lng}")
+        resp = requests.get(
+            OPENWEATHER_AQI_URL,
+            params={"lat": lat, "lon": lng, "appid": OPENWEATHER_API_KEY},
             timeout=10,
         )
-        print(f"[AQ] Locations status: {loc_resp.status_code}")
-        print(f"[AQ] Locations response: {loc_resp.text[:500]}")
+        print(f"[AQ] Response status: {resp.status_code}")
 
-        if loc_resp.status_code != 200:
-            raise ValueError(f"locations API returned {loc_resp.status_code}")
+        if resp.status_code != 200:
+            print(f"[AQ] API error: {resp.text[:300]}")
+            return None
 
-        locations = loc_resp.json().get("results", [])
-        if not locations:
-            print(f"[AQ] No stations found within 25km, using fallback")
-            set_cache(cache_key, FALLBACK, CACHE_TTL_AIRQUALITY)
-            return FALLBACK
+        payload = resp.json()
+        items = payload.get("list", [])
+        if not items:
+            print("[AQ] Empty 'list' in response — no data available")
+            return None
 
-        station      = locations[0]
-        station_id   = station.get("id")
-        station_name = station.get("name", "Unknown Station")
-        station_lat  = station.get("coordinates", {}).get("latitude", lat)
-        station_lng  = station.get("coordinates", {}).get("longitude", lng)
-        dist_km      = round(haversine_km(lat, lng, station_lat, station_lng), 2)
-        print(f"[AQ] Found station: {station_name}, id: {station_id}")
+        entry = items[0]
 
-        # 2. Get sensors for this station
-        print(f"[AQ] Fetching sensors for station {station_id}")
-        sensors_resp = requests.get(
-            f"https://api.openaq.org/v3/locations/{station_id}/sensors",
-            headers=OPENAQ_HEADERS,
-            timeout=10,
-        )
-        print(f"[AQ] Sensors status: {sensors_resp.status_code}")
+        # European AQI index (1–5)
+        eu_aqi = entry.get("main", {}).get("aqi")
+        if eu_aqi is None:
+            print("[AQ] Missing main.aqi in response")
+            return None
 
-        sensors      = sensors_resp.json().get("results", []) if sensors_resp.status_code == 200 else []
-        pm25_sensor  = next(
-            (s for s in sensors
-             if s.get("parameter", {}).get("name", "").lower() in ("pm25", "pm2.5")),
-            None
-        )
-        print(f"[AQ] PM2.5 sensor: {pm25_sensor}")
+        components = entry.get("components", {})
 
-        if not pm25_sensor:
-            print(f"[AQ] No PM2.5 sensor at this station — using fallback")
-            result = {**FALLBACK, "station_name": station_name, "distance_km": dist_km}
-            set_cache(cache_key, result, CACHE_TTL_AIRQUALITY)
-            return result
+        # PM2.5 for US-style AQI conversion
+        pm25_val = components.get("pm2_5", 0)
+        us_aqi = pm25_to_aqi(pm25_val) if pm25_val > 0 else 0
 
-        sensor_id = pm25_sensor["id"]
-        print(f"[AQ] Fetching measurements for sensor {sensor_id}")
-        meas_resp = requests.get(
-            f"https://api.openaq.org/v3/sensors/{sensor_id}/measurements",
-            headers=OPENAQ_HEADERS,
-            params={"limit": 1000, "period_name": "day"},
-            timeout=10,
-        )
-        print(f"[AQ] Measurements status: {meas_resp.status_code}")
+        # Build HabitatScore-compatible score (0-100)
+        habitat_score = AQI_SCORE_MAP.get(eu_aqi, 60)
 
-        if meas_resp.status_code != 200:
-            raise ValueError(f"measurements API returned {meas_resp.status_code}")
+        data = {
+            "aqi_current":     us_aqi,
+            "aqi_score":       habitat_score,
+            "annual_avg_pm25": round(pm25_val, 2),
+            "aqi_rating":      aqi_rating(us_aqi),
+            "rating":          aqi_rating(us_aqi),
+            "aqi_colour":      aqi_colour(us_aqi),
+            "is_fallback":     False,
+            "station_name":    "OpenWeatherMap",
+            "pollutants": {
+                "pm2_5": round(components.get("pm2_5", 0), 2),
+                "pm10":  round(components.get("pm10", 0), 2),
+                "no2":   round(components.get("no2", 0), 2),
+                "o3":    round(components.get("o3", 0), 2),
+                "so2":   round(components.get("so2", 0), 2),
+                "co":    round(components.get("co", 0), 2),
+            },
+        }
 
-        results = meas_resp.json().get("results", [])
-        print(f"[AQ] Measurements count: {len(results)}")
-        print(f"[AQ] Sample measurement: {results[0] if results else None}")
-
-        measurements = results
+        print(f"[AQ] Done — US AQI={us_aqi} ({aqi_rating(us_aqi)}), "
+              f"EU AQI={eu_aqi} ({AQI_LABEL_MAP.get(eu_aqi, '?')}), "
+              f"PM2.5={pm25_val} µg/m³")
+        set_cache(cache_key, data, CACHE_TTL_AIRQUALITY)
+        return data
 
     except Exception as e:
         import traceback
         print(f"[AQ] Exception: {str(e)}")
         traceback.print_exc()
-        set_cache(cache_key, FALLBACK, CACHE_TTL_AIRQUALITY)
-        return FALLBACK
-
-    # 3. Process PM2.5 — v3 sensor measurements format:
-    #    { "value": 38.5, "period": { "datetimeTo": { "utc": "2024-..." }, ... } }
-    pm25_values  = []
-    monthly_pm25 = defaultdict(list)
-    for m in measurements:
-        value = m.get("value")
-        if value is None or value <= 0:
-            continue
-        pm25_values.append(value)
-        try:
-            period   = m.get("period", {})
-            date_str = (
-                period.get("datetimeTo", {}).get("utc", "")
-                or period.get("datetimeFrom", {}).get("utc", "")
-                or m.get("date", {}).get("utc", "")
-                or ""
-            )
-            month_idx = int(date_str[5:7]) - 1
-            monthly_pm25[month_idx].append(value)
-        except (ValueError, IndexError, TypeError):
-            pass
-
-    print(f"[AQ] PM2.5 readings found: {len(pm25_values)}")
-
-    if not pm25_values:
-        print(f"[AQ] No PM2.5 data — using fallback values with real station name")
-        result = {**FALLBACK, "station_name": station_name, "distance_km": dist_km}
-        set_cache(cache_key, result, CACHE_TTL_AIRQUALITY)
-        return result
-
-    avg_pm25 = round(sum(pm25_values) / len(pm25_values), 2)
-    avg_aqi  = pm25_to_aqi(avg_pm25)
-    print(f"[AQ] avg PM2.5={avg_pm25} µg/m³  avg AQI={avg_aqi}")
-
-    worst_month, best_month = "December", "July"
-    if monthly_pm25:
-        monthly_avgs = {m: sum(v)/len(v) for m, v in monthly_pm25.items()}
-        best_idx  = min(monthly_avgs, key=monthly_avgs.get)
-        worst_idx = max(monthly_avgs, key=monthly_avgs.get)
-        worst_month = MONTH_NAMES[worst_idx]
-        best_month  = MONTH_NAMES[best_idx]
-
-    data = {
-        "aqi_current":      avg_aqi,
-        "annual_avg_aqi":   avg_aqi,
-        "annual_avg_pm25":  avg_pm25,
-        "aqi_rating":       aqi_rating(avg_aqi),
-        "rating":           aqi_rating(avg_aqi),
-        "worst_month":      worst_month,
-        "best_month":       best_month,
-        "station_name":     station_name,
-        "distance_km":      dist_km,
-        "is_fallback":      False,
-        "aqi_colour":       aqi_colour(avg_aqi),
-    }
-
-    print(f"[AQ] Done — AQI={avg_aqi} ({aqi_rating(avg_aqi)}), station={station_name}, dist={dist_km}km")
-    set_cache(cache_key, data, CACHE_TTL_AIRQUALITY)
-    return data
+        return None
 
 
 # ── Flask route ───────────────────────────────────────────────────────────────
@@ -252,4 +166,6 @@ def get_airquality():
         return jsonify({"success": False, "error": "lng must be a valid number"}), 400
 
     data = get_airquality_data(lat, lng)
+    if data is None:
+        return jsonify({"success": False, "error": "Air quality data unavailable for this location"}), 502
     return jsonify({"success": True, "data": data})

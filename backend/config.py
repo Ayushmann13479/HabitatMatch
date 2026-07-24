@@ -14,8 +14,8 @@ FOURSQUARE_API_KEY = os.getenv("FOURSQUARE_API_KEY", "")
 # Groq AI (Llama 3.1 70B)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
-# OpenAQ Air Quality
-OPENAQ_API_KEY = os.getenv("OPENAQ_API_KEY", "")
+# OpenWeatherMap Air Pollution
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 # Upstash Redis (serverless)
 UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL", "")
