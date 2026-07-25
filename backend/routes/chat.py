@@ -193,7 +193,7 @@ def post_chat():
     # ── Fetch all property data ───────────────────────────────────────────────
     nearby   = get_nearby_data(lat, lng)
     disaster = get_disaster_data(lat, lng)
-    aqi      = get_airquality_data(lat, lng)
+    aqi, _   = get_airquality_data(lat, lng)
     vibe     = get_vibe_data(lat, lng, address)
     score    = get_score_data(lat, lng, address)
 
@@ -228,7 +228,7 @@ def post_chat():
         "vibe_tag":         vibe.get("vibe_tag")                       if vibe    else None,
     }
 
-    reply = chat_with_context(
+    reply, ai_error_code = chat_with_context(
         system_context=context,
         history=conversation_history,
         new_message=message,
@@ -275,6 +275,7 @@ def post_chat():
             "reply": reply,
             "conversation_history": conversation_history,
             "session_id": session_id,
+            "ai_error_code": ai_error_code,  # None on success, error code on fallback
         },
     })
 

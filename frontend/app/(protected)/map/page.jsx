@@ -132,30 +132,39 @@ function MapContent() {
 
     const token = await getToken()
 
+    const _errMsg = (err, fallback) => {
+      if (err.message?.includes('Network Error')) return 'Check your internet connection'
+      const s = err.response?.status
+      if (s === 429) return 'Service is busy — try again shortly'
+      if (s === 504) return 'Service timed out — try again'
+      if (s === 401 || s === 403) return 'Authentication error'
+      return err.response?.data?.error || fallback
+    }
+
     Promise.allSettled([
       getNearby(lat, lng, token)
         .then(res => { setNearbyData(res.data.data); setPlaces(res.data.data?.places || []) })
-        .catch(err => setNearbyError(err.message?.includes('Network Error') ? 'Check your internet connection' : 'Could not load nearby places'))
+        .catch(err => setNearbyError(_errMsg(err, 'Could not load nearby places')))
         .finally(() => setNearbyLoading(false)),
 
       getDisaster(lat, lng, token)
         .then(res => setDisasterData(res.data.data))
-        .catch(err => setDisasterError(err.message?.includes('Network Error') ? 'Check your internet connection' : 'Could not load risk data'))
+        .catch(err => setDisasterError(_errMsg(err, 'Could not load risk data')))
         .finally(() => setDisasterLoading(false)),
 
       getAirQuality(lat, lng, token)
         .then(res => setAirqualityData(res.data.data))
-        .catch(err => setAirqualityError(err.message?.includes('Network Error') ? 'Check your internet connection' : 'Could not load air quality data'))
+        .catch(err => setAirqualityError(_errMsg(err, 'Could not load air quality data')))
         .finally(() => setAirqualityLoading(false)),
 
       getVibe(lat, lng, address, token)
         .then(res => setVibeData(res.data.data))
-        .catch(err => setVibeError(err.message?.includes('Network Error') ? 'Check your internet connection' : 'Could not generate neighbourhood vibe'))
+        .catch(err => setVibeError(_errMsg(err, 'Could not generate neighbourhood vibe')))
         .finally(() => setVibeLoading(false)),
 
       getScore(lat, lng, address, token)
         .then(res => setScoreData(res.data.data))
-        .catch(err => setScoreError(err.message?.includes('Network Error') ? 'Check your internet connection' : 'Could not calculate HabitatScore'))
+        .catch(err => setScoreError(_errMsg(err, 'Could not calculate HabitatScore')))
         .finally(() => setScoreLoading(false)),
     ])
   }

@@ -8,3 +8,4 @@ psycopg2-binary
 upstash-redis
 requests
 gunicorn
+clerk-backend-api

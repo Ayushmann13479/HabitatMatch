@@ -4,6 +4,8 @@ routes/airquality.py — Real-time AQI via OpenWeatherMap Air Pollution API.
 GET /api/airquality?lat=&lng=
 """
 
+import time
+
 import requests
 from flask import Blueprint, jsonify, request
 
@@ -59,94 +61,117 @@ def aqi_colour(aqi: int) -> str:
 
 
 # ── Pure data function (reusable internally) ──────────────────────────────────
-def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) -> dict | None:
+def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) -> tuple[dict | None, str | None]:
     """
-    Core AQI logic — returns data dict or None on genuine failure.
-    No hardcoded fallback: if the API fails, callers get None.
+    Core AQI logic — returns (data, error_code) tuple.
+    data is None on failure; error_code describes why.
     """
     cache_key = f"airquality:{round(lat, 4)}:{round(lng, 4)}"
 
     # wait_for_cache: poll for a cached result (used by score/vibe)
     if wait_for_cache:
-        import time
         for _ in range(15):
             cached = get_cache(cache_key)
             if cached:
-                return cached
+                return cached, None
             time.sleep(1)
-        return None
+        return None, "CACHE_TIMEOUT"
 
     cached = get_cache(cache_key)
     if cached:
         print(f"[AQ] Cache hit for {lat},{lng}")
-        return cached
+        return cached, None
 
-    try:
-        print(f"[AQ] Fetching OpenWeatherMap Air Pollution for {lat},{lng}")
-        resp = requests.get(
-            OPENWEATHER_AQI_URL,
-            params={"lat": lat, "lon": lng, "appid": OPENWEATHER_API_KEY},
-            timeout=10,
-        )
-        print(f"[AQ] Response status: {resp.status_code}")
+    last_error = None
+    for attempt in range(1, 3):
+        try:
+            print(f"[AQ] Fetching OpenWeatherMap Air Pollution for {lat},{lng} (attempt {attempt}/2)")
+            resp = requests.get(
+                OPENWEATHER_AQI_URL,
+                params={"lat": lat, "lon": lng, "appid": OPENWEATHER_API_KEY},
+                timeout=10,
+            )
+            print(f"[AQ] Response status: {resp.status_code}")
 
-        if resp.status_code != 200:
-            print(f"[AQ] API error: {resp.text[:300]}")
-            return None
+            if resp.status_code == 401:
+                print(f"[AQ] API key invalid — not retrying")
+                return None, "AUTH_FAILURE"
 
-        payload = resp.json()
-        items = payload.get("list", [])
-        if not items:
-            print("[AQ] Empty 'list' in response — no data available")
-            return None
+            if resp.status_code == 429:
+                print(f"[AQ] Rate limited (attempt {attempt}/2)")
+                last_error = "RATE_LIMITED"
+                if attempt < 2:
+                    time.sleep(2)
+                continue
 
-        entry = items[0]
+            if resp.status_code != 200:
+                print(f"[AQ] API error {resp.status_code}: {resp.text[:300]}")
+                last_error = "UPSTREAM_ERROR"
+                if attempt < 2:
+                    time.sleep(1.5)
+                continue
 
-        # European AQI index (1–5)
-        eu_aqi = entry.get("main", {}).get("aqi")
-        if eu_aqi is None:
-            print("[AQ] Missing main.aqi in response")
-            return None
+            payload = resp.json()
+            items = payload.get("list", [])
+            if not items:
+                print("[AQ] Empty 'list' in response — no data available")
+                return None, "NO_DATA"
 
-        components = entry.get("components", {})
+            entry = items[0]
 
-        # PM2.5 for US-style AQI conversion
-        pm25_val = components.get("pm2_5", 0)
-        us_aqi = pm25_to_aqi(pm25_val) if pm25_val > 0 else 0
+            # European AQI index (1–5)
+            eu_aqi = entry.get("main", {}).get("aqi")
+            if eu_aqi is None:
+                print("[AQ] Missing main.aqi in response")
+                return None, "NO_DATA"
 
-        # Build HabitatScore-compatible score (0-100)
-        habitat_score = AQI_SCORE_MAP.get(eu_aqi, 60)
+            components = entry.get("components", {})
 
-        data = {
-            "aqi_current":     us_aqi,
-            "aqi_score":       habitat_score,
-            "annual_avg_pm25": round(pm25_val, 2),
-            "aqi_rating":      aqi_rating(us_aqi),
-            "rating":          aqi_rating(us_aqi),
-            "aqi_colour":      aqi_colour(us_aqi),
-            "is_fallback":     False,
-            "station_name":    "OpenWeatherMap",
-            "pollutants": {
-                "pm2_5": round(components.get("pm2_5", 0), 2),
-                "pm10":  round(components.get("pm10", 0), 2),
-                "no2":   round(components.get("no2", 0), 2),
-                "o3":    round(components.get("o3", 0), 2),
-                "so2":   round(components.get("so2", 0), 2),
-                "co":    round(components.get("co", 0), 2),
-            },
-        }
+            # PM2.5 for US-style AQI conversion
+            pm25_val = components.get("pm2_5", 0)
+            us_aqi = pm25_to_aqi(pm25_val) if pm25_val > 0 else 0
 
-        print(f"[AQ] Done — US AQI={us_aqi} ({aqi_rating(us_aqi)}), "
-              f"EU AQI={eu_aqi} ({AQI_LABEL_MAP.get(eu_aqi, '?')}), "
-              f"PM2.5={pm25_val} µg/m³")
-        set_cache(cache_key, data, CACHE_TTL_AIRQUALITY)
-        return data
+            # Build HabitatScore-compatible score (0-100)
+            habitat_score = AQI_SCORE_MAP.get(eu_aqi, 60)
 
-    except Exception as e:
-        import traceback
-        print(f"[AQ] Exception: {str(e)}")
-        traceback.print_exc()
-        return None
+            data = {
+                "aqi_current":     us_aqi,
+                "aqi_score":       habitat_score,
+                "annual_avg_pm25": round(pm25_val, 2),
+                "aqi_rating":      aqi_rating(us_aqi),
+                "rating":          aqi_rating(us_aqi),
+                "aqi_colour":      aqi_colour(us_aqi),
+                "is_fallback":     False,
+                "station_name":    "OpenWeatherMap",
+                "pollutants": {
+                    "pm2_5": round(components.get("pm2_5", 0), 2),
+                    "pm10":  round(components.get("pm10", 0), 2),
+                    "no2":   round(components.get("no2", 0), 2),
+                    "o3":    round(components.get("o3", 0), 2),
+                    "so2":   round(components.get("so2", 0), 2),
+                    "co":    round(components.get("co", 0), 2),
+                },
+            }
+
+            print(f"[AQ] Done — US AQI={us_aqi} ({aqi_rating(us_aqi)}), "
+                  f"EU AQI={eu_aqi} ({AQI_LABEL_MAP.get(eu_aqi, '?')}), "
+                  f"PM2.5={pm25_val} µg/m³")
+            set_cache(cache_key, data, CACHE_TTL_AIRQUALITY)
+            return data, None
+
+        except requests.exceptions.Timeout:
+            print(f"[AQ] Timeout (attempt {attempt}/2)")
+            last_error = "TIMEOUT"
+            if attempt < 2:
+                time.sleep(1.5)
+        except Exception as e:
+            print(f"[AQ] Exception: {type(e).__name__}: {e}")
+            last_error = "UPSTREAM_ERROR"
+            if attempt < 2:
+                time.sleep(1.5)
+
+    print(f"[AQ] Failed after 2 attempts — last_error={last_error}")
+    return None, last_error or "UPSTREAM_ERROR"
 
 
 # ── Flask route ───────────────────────────────────────────────────────────────
@@ -165,7 +190,15 @@ def get_airquality():
     except (ValueError, TypeError):
         return jsonify({"success": False, "error": "lng must be a valid number"}), 400
 
-    data = get_airquality_data(lat, lng)
+    data, error_code = get_airquality_data(lat, lng)
     if data is None:
-        return jsonify({"success": False, "error": "Air quality data unavailable for this location"}), 502
+        error_map = {
+            "AUTH_FAILURE":   ("Air quality API key is invalid",   502),
+            "RATE_LIMITED":   ("Air quality service is busy — try again shortly", 429),
+            "TIMEOUT":        ("Air quality service timed out",    504),
+            "UPSTREAM_ERROR": ("Air quality service unavailable",  502),
+            "NO_DATA":        ("No air quality data for this location", 404),
+        }
+        msg, status = error_map.get(error_code, ("Air quality data unavailable", 502))
+        return jsonify({"success": False, "error": msg, "error_code": error_code}), status
     return jsonify({"success": True, "data": data})

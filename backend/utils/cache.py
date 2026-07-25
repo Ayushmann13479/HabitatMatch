@@ -38,7 +38,8 @@ def get_cache(key: str):
     try:
         data = redis_client.get(key)
         return json.loads(data) if data else None
-    except Exception:
+    except Exception as e:
+        print(f"[CACHE] get_cache failed for '{key}': {type(e).__name__}: {e}")
         return None
 
 
@@ -48,8 +49,8 @@ def set_cache(key: str, data, ttl: int) -> None:
         return
     try:
         redis_client.set(key, json.dumps(data), ex=ttl)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[CACHE] set_cache failed for '{key}': {type(e).__name__}: {e}")
 
 
 def delete_cache(key: str) -> None:
@@ -58,5 +59,6 @@ def delete_cache(key: str) -> None:
         return
     try:
         redis_client.delete(key)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[CACHE] delete_cache failed for '{key}': {type(e).__name__}: {e}")
+

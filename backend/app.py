@@ -58,6 +58,7 @@ from routes.score import score_bp
 from routes.chat import chat_bp
 from routes.saved import saved_bp
 from routes.cache import cache_bp
+from routes.debug import debug_bp
 
 # ── Register blueprints ───────────────────────────────────────────────────────
 app.register_blueprint(nearby_bp, url_prefix="/api")
@@ -68,6 +69,7 @@ app.register_blueprint(score_bp, url_prefix="/api")
 app.register_blueprint(chat_bp, url_prefix="/api")
 app.register_blueprint(saved_bp, url_prefix="/api")
 app.register_blueprint(cache_bp, url_prefix="/api")
+app.register_blueprint(debug_bp, url_prefix="/api")
 
 
 # ── Create DB tables on startup ───────────────────────────────────────────────

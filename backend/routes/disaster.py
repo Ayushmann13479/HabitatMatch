@@ -99,18 +99,29 @@ def get_disaster_data(lat: float, lng: float, wait_for_cache: bool = False) -> d
     if cached:
         return cached
 
-    # 1. Elevation
+    # 1. Elevation (2 attempts with backoff)
     elevation = 10
-    try:
-        elev_resp = requests.get(
-            "https://api.open-elevation.com/api/v1/lookup",
-            params={"locations": f"{lat},{lng}"},
-            timeout=5,
-        )
-        if elev_resp.status_code == 200:
-            elevation = elev_resp.json()["results"][0]["elevation"]
-    except Exception:
-        pass
+    for attempt in range(1, 3):
+        try:
+            elev_resp = requests.get(
+                "https://api.open-elevation.com/api/v1/lookup",
+                params={"locations": f"{lat},{lng}"},
+                timeout=5,
+            )
+            if elev_resp.status_code == 200:
+                elevation = elev_resp.json()["results"][0]["elevation"]
+                break
+            else:
+                print(f"[DISASTER] Elevation API returned {elev_resp.status_code} (attempt {attempt}/2)")
+        except requests.exceptions.Timeout:
+            print(f"[DISASTER] Elevation API timed out (attempt {attempt}/2)")
+        except Exception as e:
+            print(f"[DISASTER] Elevation API error: {type(e).__name__} (attempt {attempt}/2)")
+        if attempt < 2:
+            import time
+            time.sleep(1)
+    else:
+        print(f"[DISASTER] Using default elevation={elevation}m for {lat},{lng}")
 
     # 2. Coastal distance
     coastal_distance = min(haversine(lat, lng, cp[0], cp[1]) for cp in COASTLINE)

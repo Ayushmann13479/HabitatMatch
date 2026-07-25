@@ -189,7 +189,8 @@ def get_score_data(lat: float, lng: float, address: str) -> dict | None:
     nearby   = get_nearby_data(lat, lng, wait_for_cache=False) or {"places": [], "counts": {}}
     print(f"[SCORE] nearby: {len(nearby.get('places',[]))} places (cache={'hit' if time.time()-start_time < 0.1 else 'miss'})")
     disaster = get_disaster_data(lat, lng, wait_for_cache=False) or {}
-    aqi      = get_airquality_data(lat, lng, wait_for_cache=False) or {}
+    aqi, _   = get_airquality_data(lat, lng, wait_for_cache=False)
+    aqi      = aqi or {}
     vibe     = get_vibe_data(lat, lng, address)
     end_time = time.time()
     print(f"[SCORE] All data ready in {end_time - start_time:.2f}s")

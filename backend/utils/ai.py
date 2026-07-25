@@ -29,20 +29,41 @@ MODEL = "llama-3.3-70b-versatile"
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
-def clean_json_response(text: str) -> str:
-    """Strip markdown code fences that the model sometimes adds."""
-    text = re.sub(r"```json\s*", "", text)
+def _sanitize_json_text(raw: str) -> str:
+    """Strip markdown fences AND control characters that break json.loads().
+
+    Groq's LLM occasionally emits literal newlines/tabs inside JSON string
+    values (e.g. in a 'pros' list).  These are invalid per RFC 8259 §7 and
+    cause json.JSONDecodeError.  We replace all C0 control chars (U+0000 –
+    U+001F) with a space before parsing.
+    """
+    text = re.sub(r"```json\s*", "", raw)
     text = re.sub(r"```\s*", "", text)
+    text = re.sub(r'[\x00-\x1f]+', ' ', text)
     return text.strip()
+
+
+def _classify_error(exc: Exception) -> str:
+    """Map a Groq SDK / network exception to a human-friendly error code."""
+    name = type(exc).__name__
+    msg = str(exc).lower()
+    if 'timeout' in name.lower() or 'timeout' in msg:
+        return 'TIMEOUT'
+    if 'ratelimit' in name.lower() or '429' in msg or 'rate' in msg:
+        return 'RATE_LIMITED'
+    if 'authentication' in name.lower() or '401' in msg:
+        return 'AUTH_FAILURE'
+    return 'API_ERROR'
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
 def generate_json(prompt: str, retry: bool = True):
     """
-    Generate structured JSON from *prompt*.
+    Generate structured JSON from *prompt* using Groq's JSON mode.
     Returns a parsed dict/list on success, or None on failure.
     """
     if not client:
+        logger.warning("[AI] generate_json skipped — no Groq client")
         return None
 
     full_prompt = (
@@ -51,46 +72,43 @@ def generate_json(prompt: str, retry: bool = True):
         "No backticks. No explanation. Just the JSON object."
     )
 
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": full_prompt}],
-            temperature=0.1,
-            max_tokens=600,
-            stream=False,
-        )
-        text = response.choices[0].message.content
-        cleaned = clean_json_response(text)
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        if not retry:
-            return None
-        time.sleep(2)
+    for attempt in range(1, 3 if retry else 2):
         try:
-            retry_prompt = (
-                prompt
-                + "\n\nYour last response was not valid JSON. "
-                "Return ONLY the raw JSON object. Nothing else at all."
-            )
+            logger.info("[AI] generate_json attempt %d — calling Groq (JSON mode)", attempt)
             response = client.chat.completions.create(
                 model=MODEL,
-                messages=[{"role": "user", "content": retry_prompt}],
+                messages=[{"role": "user", "content": full_prompt}],
+                response_format={"type": "json_object"},
                 temperature=0.1,
                 max_tokens=600,
                 stream=False,
+                timeout=15,
             )
-            text = response.choices[0].message.content
-            cleaned = clean_json_response(text)
-            return json.loads(cleaned)
+            raw_text = response.choices[0].message.content
+            cleaned = _sanitize_json_text(raw_text)
+            try:
+                return json.loads(cleaned)
+            except json.JSONDecodeError as je:
+                logger.error(
+                    "[AI] generate_json parse failure (attempt %d): %s\n"
+                    "[AI] RAW RESPONSE >>>\n%s\n<<< END RAW",
+                    attempt, je, raw_text[:1000]
+                )
+                if attempt < (3 if retry else 2):
+                    time.sleep(2)
+                continue
+
         except Exception as e:
-            logger.warning("[AI] JSON retry failed: %s", e)
-            return None
-    except Exception as e:
-        logger.warning("[AI] generate_json error: %s", e)
-        if retry:
-            time.sleep(3)
-            return generate_json(prompt, retry=False)
-        return None
+            err_code = _classify_error(e)
+            logger.warning(
+                "[AI] generate_json API error (attempt %d): [%s] %s",
+                attempt, err_code, e
+            )
+            if attempt < (3 if retry else 2):
+                time.sleep(3)
+
+    logger.error("[AI] generate_json failed after all attempts")
+    return None
 
 
 def generate_text(prompt: str, max_words: int = 150) -> str | None:
@@ -107,6 +125,7 @@ def generate_text(prompt: str, max_words: int = 150) -> str | None:
             temperature=0.5,
             max_tokens=200,
             stream=False,
+            timeout=15,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -119,15 +138,16 @@ def chat_with_context(
     history: list,
     new_message: str,
     fallback_data: dict | None = None,
-) -> str:
+) -> tuple[str, str | None]:
     """
     Continue a property-aware conversational chat session using Groq.
 
-    Uses the OpenAI-compatible message format with a proper "system" role
-    for the system prompt, which is the correct approach for Groq/Llama.
+    Returns (reply_text, error_code).  error_code is None on success,
+    or one of TIMEOUT / RATE_LIMITED / AUTH_FAILURE / API_ERROR on failure.
     """
     if not client:
-        return _natural_fallback(new_message, fallback_data)
+        logger.warning("[AI] chat skipped — no Groq client")
+        return _natural_fallback(new_message, fallback_data), "NO_CLIENT"
 
     messages = [{"role": "system", "content": system_context}]
 
@@ -141,25 +161,32 @@ def chat_with_context(
     messages.append({"role": "user", "content": new_message})
 
     # ── Attempt with one retry ───────────────────────────────────────────────
+    last_error_code = None
     for attempt in range(1, 3):
         try:
+            logger.info("[AI] chat attempt %d/2 — calling Groq", attempt)
             response = client.chat.completions.create(
                 model=MODEL,
                 messages=messages,
                 temperature=0.7,
                 max_tokens=300,
                 stream=False,
+                timeout=15,
             )
-            return response.choices[0].message.content.strip()
+            reply = response.choices[0].message.content.strip()
+            logger.info("[AI] chat attempt %d/2 — success (%d chars)", attempt, len(reply))
+            return reply, None
         except Exception as e:
+            last_error_code = _classify_error(e)
             logger.warning(
-                "[AI] chat error (attempt %d/2): %s", attempt, e
+                "[AI] chat error (attempt %d/2): [%s] %s",
+                attempt, last_error_code, e
             )
             if attempt < 2:
                 time.sleep(3)
 
-    logger.error("[AI] chat failed after 2 attempts — serving fallback")
-    return _natural_fallback(new_message, fallback_data)
+    logger.error("[AI] chat failed after 2 attempts [%s] — serving fallback", last_error_code)
+    return _natural_fallback(new_message, fallback_data), last_error_code
 
 
 def _natural_fallback(question: str, data: dict | None) -> str:
