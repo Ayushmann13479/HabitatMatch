@@ -29,20 +29,114 @@ AQI_LABEL_MAP = {
 }
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def pm25_to_aqi(pm25: float) -> int:
-    """Convert PM2.5 µg/m³ to US AQI integer."""
-    breakpoints = [
-        (0.0,   12.0,   0,   50),
-        (12.1,  35.4,  51,  100),
-        (35.5,  55.4, 101,  150),
-        (55.5, 150.4, 151,  200),
-        (150.5, 500.0, 201, 500),
-    ]
-    for lo_pm, hi_pm, lo_aqi, hi_aqi in breakpoints:
-        if lo_pm <= pm25 <= hi_pm:
-            return round(lo_aqi + (pm25 - lo_pm) / (hi_pm - lo_pm) * (hi_aqi - lo_aqi))
-    return 201
+# ── EPA AQI Calculations ──────────────────────────────────────────────────────
+# Using standard US EPA breakpoints (with 2024 PM2.5 updates).
+# Note: OpenWeatherMap returns concentrations in µg/m³. EPA uses ppb/ppm for some gases.
+# We convert gases to their EPA units before calculating the index.
+
+def _calc_subindex(c: float, breakpoints: list[tuple[float, float, int, int]]) -> int:
+    """Standard EPA linear interpolation formula."""
+    for lo_c, hi_c, lo_i, hi_i in breakpoints:
+        if lo_c <= c <= hi_c:
+            return round(((hi_i - lo_i) / (hi_c - lo_c)) * (c - lo_c) + lo_i)
+    # If above max breakpoint, extrapolate or cap at 500
+    if breakpoints:
+        _, hi_c, _, hi_i = breakpoints[-1]
+        if c > hi_c:
+            # We'll just return max defined or scale linearly (simplified to 500 cap for now)
+            return hi_i 
+    return 0
+
+
+def calculate_epa_aqi(components: dict) -> tuple[int, str]:
+    """
+    Calculate the overall US AQI based on the maximum sub-index of all pollutants.
+    Returns (overall_aqi, dominant_pollutant_name).
+    """
+    sub_indices = {}
+
+    # PM2.5 (µg/m³) - 2024 breakpoints
+    pm25 = components.get("pm2_5", -1)
+    if pm25 >= 0:
+        sub_indices["PM2.5"] = _calc_subindex(pm25, [
+            (0.0, 9.0, 0, 50),
+            (9.1, 35.4, 51, 100),
+            (35.5, 55.4, 101, 150),
+            (55.5, 125.4, 151, 200),
+            (125.5, 225.4, 201, 300),
+            (225.5, 500.0, 301, 500),
+        ])
+
+    # PM10 (µg/m³)
+    pm10 = components.get("pm10", -1)
+    if pm10 >= 0:
+        sub_indices["PM10"] = _calc_subindex(pm10, [
+            (0.0, 54.0, 0, 50),
+            (55.0, 154.0, 51, 100),
+            (155.0, 254.0, 101, 150),
+            (255.0, 354.0, 151, 200),
+            (355.0, 424.0, 201, 300),
+            (425.0, 604.0, 301, 500),
+        ])
+
+    # O3 (ppb) - OpenWeatherMap gives µg/m³. 1 ppb O3 ≈ 2.00 µg/m³.
+    o3_ugm3 = components.get("o3", -1)
+    if o3_ugm3 >= 0:
+        o3_ppb = o3_ugm3 / 2.00
+        sub_indices["O3"] = _calc_subindex(o3_ppb, [
+            (0.0, 54.0, 0, 50),
+            (55.0, 70.0, 51, 100),
+            (71.0, 85.0, 101, 150),
+            (86.0, 105.0, 151, 200),
+            (106.0, 200.0, 201, 300),
+            (201.0, 604.0, 301, 500), # Simplified blending of 8hr/1hr
+        ])
+
+    # NO2 (ppb) - OpenWeatherMap gives µg/m³. 1 ppb NO2 ≈ 1.88 µg/m³.
+    no2_ugm3 = components.get("no2", -1)
+    if no2_ugm3 >= 0:
+        no2_ppb = no2_ugm3 / 1.88
+        sub_indices["NO2"] = _calc_subindex(no2_ppb, [
+            (0.0, 53.0, 0, 50),
+            (54.0, 100.0, 51, 100),
+            (101.0, 360.0, 101, 150),
+            (361.0, 649.0, 151, 200),
+            (650.0, 1249.0, 201, 300),
+            (1250.0, 2049.0, 301, 500),
+        ])
+
+    # SO2 (ppb) - OpenWeatherMap gives µg/m³. 1 ppb SO2 ≈ 2.62 µg/m³.
+    so2_ugm3 = components.get("so2", -1)
+    if so2_ugm3 >= 0:
+        so2_ppb = so2_ugm3 / 2.62
+        sub_indices["SO2"] = _calc_subindex(so2_ppb, [
+            (0.0, 35.0, 0, 50),
+            (36.0, 75.0, 51, 100),
+            (76.0, 185.0, 101, 150),
+            (186.0, 304.0, 151, 200),
+            (305.0, 604.0, 201, 300),
+            (605.0, 1004.0, 301, 500),
+        ])
+
+    # CO (ppm) - OpenWeatherMap gives µg/m³. 1 ppm CO ≈ 1150 µg/m³.
+    co_ugm3 = components.get("co", -1)
+    if co_ugm3 >= 0:
+        co_ppm = co_ugm3 / 1150.0
+        sub_indices["CO"] = _calc_subindex(co_ppm, [
+            (0.0, 4.4, 0, 50),
+            (4.5, 9.4, 51, 100),
+            (9.5, 12.4, 101, 150),
+            (12.5, 15.4, 151, 200),
+            (15.5, 30.4, 201, 300),
+            (30.5, 50.4, 301, 500),
+        ])
+
+    if not sub_indices:
+        return 0, "Unknown"
+
+    # AQI is the maximum of all sub-indices
+    dominant = max(sub_indices.items(), key=lambda x: x[1])
+    return dominant[1], dominant[0]
 
 
 def aqi_rating(aqi: int) -> str:
@@ -57,7 +151,9 @@ def aqi_colour(aqi: int) -> str:
     if aqi <= 50:   return "green"
     if aqi <= 100:  return "yellow"
     if aqi <= 150:  return "orange"
-    return "red"
+    if aqi <= 200:  return "red"
+    if aqi <= 300:  return "purple"
+    return "maroon"
 
 
 # ── Pure data function (reusable internally) ──────────────────────────────────
@@ -66,7 +162,8 @@ def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) ->
     Core AQI logic — returns (data, error_code) tuple.
     data is None on failure; error_code describes why.
     """
-    cache_key = f"airquality:{round(lat, 4)}:{round(lng, 4)}"
+    # Updated cache key to prevent serving old single-pollutant calculation
+    cache_key = f"airquality:v2:{round(lat, 4)}:{round(lng, 4)}"
 
     # wait_for_cache: poll for a cached result (used by score/vibe)
     if wait_for_cache:
@@ -127,22 +224,22 @@ def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) ->
 
             components = entry.get("components", {})
 
-            # PM2.5 for US-style AQI conversion
-            pm25_val = components.get("pm2_5", 0)
-            us_aqi = pm25_to_aqi(pm25_val) if pm25_val > 0 else 0
+            # Calculate full EPA AQI across all pollutants
+            us_aqi, dominant_pollutant = calculate_epa_aqi(components)
 
             # Build HabitatScore-compatible score (0-100)
             habitat_score = AQI_SCORE_MAP.get(eu_aqi, 60)
 
             data = {
-                "aqi_current":     us_aqi,
-                "aqi_score":       habitat_score,
-                "annual_avg_pm25": round(pm25_val, 2),
-                "aqi_rating":      aqi_rating(us_aqi),
-                "rating":          aqi_rating(us_aqi),
-                "aqi_colour":      aqi_colour(us_aqi),
-                "is_fallback":     False,
-                "station_name":    "OpenWeatherMap",
+                "aqi_current":        us_aqi,
+                "aqi_dominant":       dominant_pollutant,
+                "aqi_score":          habitat_score,
+                "annual_avg_pm25":    round(components.get("pm2_5", 0), 2),
+                "aqi_rating":         aqi_rating(us_aqi),
+                "rating":             aqi_rating(us_aqi),
+                "aqi_colour":         aqi_colour(us_aqi),
+                "is_fallback":        False,
+                "station_name":       "OpenWeatherMap",
                 "pollutants": {
                     "pm2_5": round(components.get("pm2_5", 0), 2),
                     "pm10":  round(components.get("pm10", 0), 2),
@@ -153,9 +250,8 @@ def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) ->
                 },
             }
 
-            print(f"[AQ] Done — US AQI={us_aqi} ({aqi_rating(us_aqi)}), "
-                  f"EU AQI={eu_aqi} ({AQI_LABEL_MAP.get(eu_aqi, '?')}), "
-                  f"PM2.5={pm25_val} µg/m³")
+            print(f"[AQ] Done — US AQI={us_aqi} ({aqi_rating(us_aqi)}) [Dominant: {dominant_pollutant}], "
+                  f"EU AQI={eu_aqi} ({AQI_LABEL_MAP.get(eu_aqi, '?')})")
             set_cache(cache_key, data, CACHE_TTL_AIRQUALITY)
             return data, None
 
