@@ -106,7 +106,7 @@ export default function MapComponent({
 
       try {
         const res  = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=18&addressdetails=1&accept-language=en`,
           { headers: { 'Accept-Language': 'en' } }
         )
         const data    = await res.json()

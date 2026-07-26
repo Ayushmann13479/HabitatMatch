@@ -43,7 +43,7 @@ export default function SearchBar({ onLocationSelect }) {
       try {
         const url =
           `https://nominatim.openstreetmap.org/search` +
-          `?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`
+          `?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1&accept-language=en`
         const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } })
         const data = await res.json()
         setResults(data)

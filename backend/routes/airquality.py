@@ -1,142 +1,56 @@
 """
-routes/airquality.py — Real-time AQI via OpenWeatherMap Air Pollution API.
+routes/airquality.py — Real-time AQI via OpenAQ API.
 
 GET /api/airquality?lat=&lng=
 """
 
-import time
+from collections import defaultdict
 
 import requests
 from flask import Blueprint, jsonify, request
 
-from config import OPENWEATHER_API_KEY
+from config import OPENAQ_API_KEY
 from utils.cache import CACHE_TTL_AIRQUALITY, get_cache, set_cache
 
 airquality_bp = Blueprint("airquality", __name__)
 
-OPENWEATHER_AQI_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
+OPENAQ_HEADERS = {"X-API-Key": OPENAQ_API_KEY}
 
-# ── European AQI (1-5) → HabitatScore (0-100) ────────────────────────────────
-AQI_SCORE_MAP = {1: 95, 2: 80, 3: 60, 4: 35, 5: 15}
+MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
 
-# ── European AQI (1-5) → human-readable label ────────────────────────────────
-AQI_LABEL_MAP = {
-    1: "Good",
-    2: "Fair",
-    3: "Moderate",
-    4: "Poor",
-    5: "Very Poor",
+# ── Regional fallback ─────────────────────────────────────────────────────────
+FALLBACK = {
+    "aqi_current":      95,
+    "annual_avg_aqi":   95,
+    "annual_avg_pm25":  38.0,
+    "aqi_rating":       "Moderate",
+    "rating":           "Moderate",
+    "worst_month":      "December",
+    "best_month":       "July",
+    "station_name":     "Estimated - Regional Average",
+    "distance_km":      0,
+    "is_fallback":      True,
+    "aqi_colour":       "yellow",
 }
 
 
-# ── EPA AQI Calculations ──────────────────────────────────────────────────────
-# Using standard US EPA breakpoints (with 2024 PM2.5 updates).
-# Note: OpenWeatherMap returns concentrations in µg/m³. EPA uses ppb/ppm for some gases.
-# We convert gases to their EPA units before calculating the index.
-
-def _calc_subindex(c: float, breakpoints: list[tuple[float, float, int, int]]) -> int:
-    """Standard EPA linear interpolation formula."""
-    for lo_c, hi_c, lo_i, hi_i in breakpoints:
-        if lo_c <= c <= hi_c:
-            return round(((hi_i - lo_i) / (hi_c - lo_c)) * (c - lo_c) + lo_i)
-    # If above max breakpoint, extrapolate or cap at 500
-    if breakpoints:
-        _, hi_c, _, hi_i = breakpoints[-1]
-        if c > hi_c:
-            # We'll just return max defined or scale linearly (simplified to 500 cap for now)
-            return hi_i 
-    return 0
-
-
-def calculate_epa_aqi(components: dict) -> tuple[int, str]:
-    """
-    Calculate the overall US AQI based on the maximum sub-index of all pollutants.
-    Returns (overall_aqi, dominant_pollutant_name).
-    """
-    sub_indices = {}
-
-    # PM2.5 (µg/m³) - 2024 breakpoints
-    pm25 = components.get("pm2_5", -1)
-    if pm25 >= 0:
-        sub_indices["PM2.5"] = _calc_subindex(pm25, [
-            (0.0, 9.0, 0, 50),
-            (9.1, 35.4, 51, 100),
-            (35.5, 55.4, 101, 150),
-            (55.5, 125.4, 151, 200),
-            (125.5, 225.4, 201, 300),
-            (225.5, 500.0, 301, 500),
-        ])
-
-    # PM10 (µg/m³)
-    pm10 = components.get("pm10", -1)
-    if pm10 >= 0:
-        sub_indices["PM10"] = _calc_subindex(pm10, [
-            (0.0, 54.0, 0, 50),
-            (55.0, 154.0, 51, 100),
-            (155.0, 254.0, 101, 150),
-            (255.0, 354.0, 151, 200),
-            (355.0, 424.0, 201, 300),
-            (425.0, 604.0, 301, 500),
-        ])
-
-    # O3 (ppb) - OpenWeatherMap gives µg/m³. 1 ppb O3 ≈ 2.00 µg/m³.
-    o3_ugm3 = components.get("o3", -1)
-    if o3_ugm3 >= 0:
-        o3_ppb = o3_ugm3 / 2.00
-        sub_indices["O3"] = _calc_subindex(o3_ppb, [
-            (0.0, 54.0, 0, 50),
-            (55.0, 70.0, 51, 100),
-            (71.0, 85.0, 101, 150),
-            (86.0, 105.0, 151, 200),
-            (106.0, 200.0, 201, 300),
-            (201.0, 604.0, 301, 500), # Simplified blending of 8hr/1hr
-        ])
-
-    # NO2 (ppb) - OpenWeatherMap gives µg/m³. 1 ppb NO2 ≈ 1.88 µg/m³.
-    no2_ugm3 = components.get("no2", -1)
-    if no2_ugm3 >= 0:
-        no2_ppb = no2_ugm3 / 1.88
-        sub_indices["NO2"] = _calc_subindex(no2_ppb, [
-            (0.0, 53.0, 0, 50),
-            (54.0, 100.0, 51, 100),
-            (101.0, 360.0, 101, 150),
-            (361.0, 649.0, 151, 200),
-            (650.0, 1249.0, 201, 300),
-            (1250.0, 2049.0, 301, 500),
-        ])
-
-    # SO2 (ppb) - OpenWeatherMap gives µg/m³. 1 ppb SO2 ≈ 2.62 µg/m³.
-    so2_ugm3 = components.get("so2", -1)
-    if so2_ugm3 >= 0:
-        so2_ppb = so2_ugm3 / 2.62
-        sub_indices["SO2"] = _calc_subindex(so2_ppb, [
-            (0.0, 35.0, 0, 50),
-            (36.0, 75.0, 51, 100),
-            (76.0, 185.0, 101, 150),
-            (186.0, 304.0, 151, 200),
-            (305.0, 604.0, 201, 300),
-            (605.0, 1004.0, 301, 500),
-        ])
-
-    # CO (ppm) - OpenWeatherMap gives µg/m³. 1 ppm CO ≈ 1150 µg/m³.
-    co_ugm3 = components.get("co", -1)
-    if co_ugm3 >= 0:
-        co_ppm = co_ugm3 / 1150.0
-        sub_indices["CO"] = _calc_subindex(co_ppm, [
-            (0.0, 4.4, 0, 50),
-            (4.5, 9.4, 51, 100),
-            (9.5, 12.4, 101, 150),
-            (12.5, 15.4, 151, 200),
-            (15.5, 30.4, 201, 300),
-            (30.5, 50.4, 301, 500),
-        ])
-
-    if not sub_indices:
-        return 0, "Unknown"
-
-    # AQI is the maximum of all sub-indices
-    dominant = max(sub_indices.items(), key=lambda x: x[1])
-    return dominant[1], dominant[0]
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def pm25_to_aqi(pm25: float) -> int:
+    """Convert PM2.5 µg/m³ to US AQI integer."""
+    breakpoints = [
+        (0.0,   12.0,   0,   50),
+        (12.1,  35.4,  51,  100),
+        (35.5,  55.4, 101,  150),
+        (55.5, 150.4, 151,  200),
+        (150.5, 500.0, 201, 500),
+    ]
+    for lo_pm, hi_pm, lo_aqi, hi_aqi in breakpoints:
+        if lo_pm <= pm25 <= hi_pm:
+            return round(lo_aqi + (pm25 - lo_pm) / (hi_pm - lo_pm) * (hi_aqi - lo_aqi))
+    return 201
 
 
 def aqi_rating(aqi: int) -> str:
@@ -151,123 +65,174 @@ def aqi_colour(aqi: int) -> str:
     if aqi <= 50:   return "green"
     if aqi <= 100:  return "yellow"
     if aqi <= 150:  return "orange"
-    if aqi <= 200:  return "red"
-    if aqi <= 300:  return "purple"
-    return "maroon"
+    return "red"
+
+
+def haversine_km(lat1, lng1, lat2, lng2) -> float:
+    import math
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lng2 - lng1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return R * 2 * math.asin(math.sqrt(a))
 
 
 # ── Pure data function (reusable internally) ──────────────────────────────────
-def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) -> tuple[dict | None, str | None]:
-    """
-    Core AQI logic — returns (data, error_code) tuple.
-    data is None on failure; error_code describes why.
-    """
-    # Updated cache key to prevent serving old single-pollutant calculation
-    cache_key = f"airquality:v2:{round(lat, 4)}:{round(lng, 4)}"
+def get_airquality_data(lat: float, lng: float, wait_for_cache: bool = False) -> dict:
+    """Core AQI logic — returns data dict (always succeeds; uses fallbacks)."""
+    cache_key = f"airquality:{round(lat,4)}:{round(lng,4)}"
 
-    # wait_for_cache: poll for a cached result (used by score/vibe)
     if wait_for_cache:
+        import time
         for _ in range(15):
             cached = get_cache(cache_key)
             if cached:
-                return cached, None
+                return cached
             time.sleep(1)
-        return None, "CACHE_TIMEOUT"
+        return FALLBACK
 
     cached = get_cache(cache_key)
     if cached:
         print(f"[AQ] Cache hit for {lat},{lng}")
-        return cached, None
+        return cached
 
-    last_error = None
-    for attempt in range(1, 3):
+    try:
+        # 1. Find nearest station
+        print(f"[AQ] Searching for stations near {lat},{lng}")
+        loc_resp = requests.get(
+            "https://api.openaq.org/v3/locations",
+            headers=OPENAQ_HEADERS,
+            params={"coordinates": f"{lat},{lng}", "radius": 25000, "limit": 5},
+            timeout=10,
+        )
+        print(f"[AQ] Locations status: {loc_resp.status_code}")
+        print(f"[AQ] Locations response: {loc_resp.text[:500]}")
+
+        if loc_resp.status_code != 200:
+            raise ValueError(f"locations API returned {loc_resp.status_code}")
+
+        locations = loc_resp.json().get("results", [])
+        if not locations:
+            print(f"[AQ] No stations found within 25km, using fallback")
+            set_cache(cache_key, FALLBACK, CACHE_TTL_AIRQUALITY)
+            return FALLBACK
+
+        station      = locations[0]
+        station_id   = station.get("id")
+        station_name = station.get("name", "Unknown Station")
+        station_lat  = station.get("coordinates", {}).get("latitude", lat)
+        station_lng  = station.get("coordinates", {}).get("longitude", lng)
+        dist_km      = round(haversine_km(lat, lng, station_lat, station_lng), 2)
+        print(f"[AQ] Found station: {station_name}, id: {station_id}")
+
+        # 2. Get sensors for this station
+        print(f"[AQ] Fetching sensors for station {station_id}")
+        sensors_resp = requests.get(
+            f"https://api.openaq.org/v3/locations/{station_id}/sensors",
+            headers=OPENAQ_HEADERS,
+            timeout=10,
+        )
+        print(f"[AQ] Sensors status: {sensors_resp.status_code}")
+
+        sensors      = sensors_resp.json().get("results", []) if sensors_resp.status_code == 200 else []
+        pm25_sensor  = next(
+            (s for s in sensors
+             if s.get("parameter", {}).get("name", "").lower() in ("pm25", "pm2.5")),
+            None
+        )
+        print(f"[AQ] PM2.5 sensor: {pm25_sensor}")
+
+        if not pm25_sensor:
+            print(f"[AQ] No PM2.5 sensor at this station — using fallback")
+            result = {**FALLBACK, "station_name": station_name, "distance_km": dist_km}
+            set_cache(cache_key, result, CACHE_TTL_AIRQUALITY)
+            return result
+
+        sensor_id = pm25_sensor["id"]
+        print(f"[AQ] Fetching measurements for sensor {sensor_id}")
+        meas_resp = requests.get(
+            f"https://api.openaq.org/v3/sensors/{sensor_id}/measurements",
+            headers=OPENAQ_HEADERS,
+            params={"limit": 1000, "period_name": "day"},
+            timeout=10,
+        )
+        print(f"[AQ] Measurements status: {meas_resp.status_code}")
+
+        if meas_resp.status_code != 200:
+            raise ValueError(f"measurements API returned {meas_resp.status_code}")
+
+        results = meas_resp.json().get("results", [])
+        print(f"[AQ] Measurements count: {len(results)}")
+        print(f"[AQ] Sample measurement: {results[0] if results else None}")
+
+        measurements = results
+
+    except Exception as e:
+        import traceback
+        print(f"[AQ] Exception: {str(e)}")
+        traceback.print_exc()
+        set_cache(cache_key, FALLBACK, CACHE_TTL_AIRQUALITY)
+        return FALLBACK
+
+    # 3. Process PM2.5 — v3 sensor measurements format:
+    #    { "value": 38.5, "period": { "datetimeTo": { "utc": "2024-..." }, ... } }
+    pm25_values  = []
+    monthly_pm25 = defaultdict(list)
+    for m in measurements:
+        value = m.get("value")
+        if value is None or value <= 0:
+            continue
+        pm25_values.append(value)
         try:
-            print(f"[AQ] Fetching OpenWeatherMap Air Pollution for {lat},{lng} (attempt {attempt}/2)")
-            resp = requests.get(
-                OPENWEATHER_AQI_URL,
-                params={"lat": lat, "lon": lng, "appid": OPENWEATHER_API_KEY},
-                timeout=10,
+            period   = m.get("period", {})
+            date_str = (
+                period.get("datetimeTo", {}).get("utc", "")
+                or period.get("datetimeFrom", {}).get("utc", "")
+                or m.get("date", {}).get("utc", "")
+                or ""
             )
-            print(f"[AQ] Response status: {resp.status_code}")
+            month_idx = int(date_str[5:7]) - 1
+            monthly_pm25[month_idx].append(value)
+        except (ValueError, IndexError, TypeError):
+            pass
 
-            if resp.status_code == 401:
-                print(f"[AQ] API key invalid — not retrying")
-                return None, "AUTH_FAILURE"
+    print(f"[AQ] PM2.5 readings found: {len(pm25_values)}")
 
-            if resp.status_code == 429:
-                print(f"[AQ] Rate limited (attempt {attempt}/2)")
-                last_error = "RATE_LIMITED"
-                if attempt < 2:
-                    time.sleep(2)
-                continue
+    if not pm25_values:
+        print(f"[AQ] No PM2.5 data — using fallback values with real station name")
+        result = {**FALLBACK, "station_name": station_name, "distance_km": dist_km}
+        set_cache(cache_key, result, CACHE_TTL_AIRQUALITY)
+        return result
 
-            if resp.status_code != 200:
-                print(f"[AQ] API error {resp.status_code}: {resp.text[:300]}")
-                last_error = "UPSTREAM_ERROR"
-                if attempt < 2:
-                    time.sleep(1.5)
-                continue
+    avg_pm25 = round(sum(pm25_values) / len(pm25_values), 2)
+    avg_aqi  = pm25_to_aqi(avg_pm25)
+    print(f"[AQ] avg PM2.5={avg_pm25} µg/m³  avg AQI={avg_aqi}")
 
-            payload = resp.json()
-            items = payload.get("list", [])
-            if not items:
-                print("[AQ] Empty 'list' in response — no data available")
-                return None, "NO_DATA"
+    worst_month, best_month = "December", "July"
+    if monthly_pm25:
+        monthly_avgs = {m: sum(v)/len(v) for m, v in monthly_pm25.items()}
+        best_idx  = min(monthly_avgs, key=monthly_avgs.get)
+        worst_idx = max(monthly_avgs, key=monthly_avgs.get)
+        worst_month = MONTH_NAMES[worst_idx]
+        best_month  = MONTH_NAMES[best_idx]
 
-            entry = items[0]
+    data = {
+        "aqi_current":      avg_aqi,
+        "annual_avg_aqi":   avg_aqi,
+        "annual_avg_pm25":  avg_pm25,
+        "aqi_rating":       aqi_rating(avg_aqi),
+        "rating":           aqi_rating(avg_aqi),
+        "worst_month":      worst_month,
+        "best_month":       best_month,
+        "station_name":     station_name,
+        "distance_km":      dist_km,
+        "is_fallback":      False,
+        "aqi_colour":       aqi_colour(avg_aqi),
+    }
 
-            # European AQI index (1–5)
-            eu_aqi = entry.get("main", {}).get("aqi")
-            if eu_aqi is None:
-                print("[AQ] Missing main.aqi in response")
-                return None, "NO_DATA"
-
-            components = entry.get("components", {})
-
-            # Calculate full EPA AQI across all pollutants
-            us_aqi, dominant_pollutant = calculate_epa_aqi(components)
-
-            # Build HabitatScore-compatible score (0-100)
-            habitat_score = AQI_SCORE_MAP.get(eu_aqi, 60)
-
-            data = {
-                "aqi_current":        us_aqi,
-                "aqi_dominant":       dominant_pollutant,
-                "aqi_score":          habitat_score,
-                "annual_avg_pm25":    round(components.get("pm2_5", 0), 2),
-                "aqi_rating":         aqi_rating(us_aqi),
-                "rating":             aqi_rating(us_aqi),
-                "aqi_colour":         aqi_colour(us_aqi),
-                "is_fallback":        False,
-                "station_name":       "OpenWeatherMap",
-                "pollutants": {
-                    "pm2_5": round(components.get("pm2_5", 0), 2),
-                    "pm10":  round(components.get("pm10", 0), 2),
-                    "no2":   round(components.get("no2", 0), 2),
-                    "o3":    round(components.get("o3", 0), 2),
-                    "so2":   round(components.get("so2", 0), 2),
-                    "co":    round(components.get("co", 0), 2),
-                },
-            }
-
-            print(f"[AQ] Done — US AQI={us_aqi} ({aqi_rating(us_aqi)}) [Dominant: {dominant_pollutant}], "
-                  f"EU AQI={eu_aqi} ({AQI_LABEL_MAP.get(eu_aqi, '?')})")
-            set_cache(cache_key, data, CACHE_TTL_AIRQUALITY)
-            return data, None
-
-        except requests.exceptions.Timeout:
-            print(f"[AQ] Timeout (attempt {attempt}/2)")
-            last_error = "TIMEOUT"
-            if attempt < 2:
-                time.sleep(1.5)
-        except Exception as e:
-            print(f"[AQ] Exception: {type(e).__name__}: {e}")
-            last_error = "UPSTREAM_ERROR"
-            if attempt < 2:
-                time.sleep(1.5)
-
-    print(f"[AQ] Failed after 2 attempts — last_error={last_error}")
-    return None, last_error or "UPSTREAM_ERROR"
+    print(f"[AQ] Done — AQI={avg_aqi} ({aqi_rating(avg_aqi)}), station={station_name}, dist={dist_km}km")
+    set_cache(cache_key, data, CACHE_TTL_AIRQUALITY)
+    return data
 
 
 # ── Flask route ───────────────────────────────────────────────────────────────
@@ -286,15 +251,5 @@ def get_airquality():
     except (ValueError, TypeError):
         return jsonify({"success": False, "error": "lng must be a valid number"}), 400
 
-    data, error_code = get_airquality_data(lat, lng)
-    if data is None:
-        error_map = {
-            "AUTH_FAILURE":   ("Air quality API key is invalid",   502),
-            "RATE_LIMITED":   ("Air quality service is busy — try again shortly", 429),
-            "TIMEOUT":        ("Air quality service timed out",    504),
-            "UPSTREAM_ERROR": ("Air quality service unavailable",  502),
-            "NO_DATA":        ("No air quality data for this location", 404),
-        }
-        msg, status = error_map.get(error_code, ("Air quality data unavailable", 502))
-        return jsonify({"success": False, "error": msg, "error_code": error_code}), status
+    data = get_airquality_data(lat, lng)
     return jsonify({"success": True, "data": data})
