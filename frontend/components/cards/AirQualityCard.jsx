@@ -48,7 +48,7 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
 
   const aqi    = data.aqi_current ?? 0
   const config = getAqiConfig(aqi)
-  const chartData = [{ name: 'AQI', value: Math.min(aqi, 200), fill: config.color }]
+  const chartData = [{ name: 'AQI', value: Math.min(aqi, 500), fill: config.color }]
 
   return (
     <div className="bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-2xl p-5 shadow-sm flex flex-col gap-3">
@@ -77,7 +77,7 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
             startAngle={180}
             endAngle={0}
           >
-            <PolarAngleAxis type="number" domain={[0, 200]} angleAxisId={0} tick={false} />
+            <PolarAngleAxis type="number" domain={[0, 500]} angleAxisId={0} tick={false} />
             <RadialBar
               background={{ fill: 'var(--bg-subtle)' }}
               clockWise
@@ -95,11 +95,16 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
         </div>
       </div>
 
-      {/* Rating badge */}
-      <div className="flex justify-center">
+      {/* Rating badge + fallback note */}
+      <div className="flex flex-col items-center gap-1">
         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${config.bg}`}>
           {data.aqi_rating || config.label}
         </span>
+        {data.fallback_note && (
+          <span className="text-[10px] text-[var(--text-tertiary)] italic">
+            {data.fallback_note}
+          </span>
+        )}
       </div>
 
       {/* Pollutant breakdown */}
@@ -116,7 +121,7 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
               <p className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">
                 {data.pollutants[key] != null ? data.pollutants[key] : '—'}
               </p>
-              <p className="text-[9px] text-[var(--text-tertiary)]">µg/m³</p>
+              <p className="text-[9px] text-[var(--text-tertiary)]">{data.is_fallback ? 'µg/m³' : 'AQI'}</p>
             </div>
           ))}
         </div>
@@ -124,7 +129,7 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
 
       {/* Source */}
       <p className="text-[11px] text-[var(--text-tertiary)] text-center truncate">
-        📡 {data.station_name || 'OpenWeatherMap'}
+        📡 {data.station_name || 'WAQI'}
       </p>
     </div>
   )

@@ -152,7 +152,7 @@ function MapContent() {
         .catch(err => setDisasterError(_errMsg(err, 'Could not load risk data')))
         .finally(() => setDisasterLoading(false)),
 
-      getAirQuality(lat, lng, token)
+      getAirQuality(lat, lng, address, token)
         .then(res => setAirqualityData(res.data.data))
         .catch(err => setAirqualityError(_errMsg(err, 'Could not load air quality data')))
         .finally(() => setAirqualityLoading(false)),
@@ -328,7 +328,7 @@ function MapContent() {
             />
             <AirQualityCard
               data={airqualityData} loading={airqualityLoading} error={airqualityError}
-              onRetry={() => refetchOne(getAirQuality, setAirqualityData, setAirqualityLoading, setAirqualityError)}
+              onRetry={() => refetchOne(getAirQuality, setAirqualityData, setAirqualityLoading, setAirqualityError, [selectedLocation.address])}
             />
             <VibeCard
               data={vibeData} loading={vibeLoading} error={vibeError}

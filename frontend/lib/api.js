@@ -17,8 +17,8 @@ export const getNearby = (lat, lng, token) =>
 export const getDisaster = (lat, lng, token) =>
   api.get('/api/disaster', { params: { lat, lng }, headers: authHeaders(token), timeout: 20000 })
 
-export const getAirQuality = (lat, lng, token) =>
-  api.get('/api/airquality', { params: { lat, lng }, headers: authHeaders(token), timeout: 20000 })
+export const getAirQuality = (lat, lng, address, token) =>
+  api.get('/api/airquality', { params: { lat, lng, address }, headers: authHeaders(token), timeout: 20000 })
 
 export const getVibe = (lat, lng, address, token) =>
   api.get('/api/vibe', { params: { lat, lng, address }, headers: authHeaders(token), timeout: 60000 })
