@@ -193,7 +193,7 @@ def post_chat():
     # ── Fetch all property data ───────────────────────────────────────────────
     nearby   = get_nearby_data(lat, lng)
     disaster = get_disaster_data(lat, lng)
-    aqi, _   = get_airquality_data(lat, lng)
+    aqi = get_airquality_data(lat, lng)
     vibe     = get_vibe_data(lat, lng, address)
     score    = get_score_data(lat, lng, address)
 
