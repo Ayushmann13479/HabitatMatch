@@ -5,6 +5,12 @@ app.py — HabitatMatch Flask application entry point.
 import time
 import logging
 
+# Configure root logger
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 from flask_compress import Compress

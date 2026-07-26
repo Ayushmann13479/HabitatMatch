@@ -8,7 +8,7 @@ import time
 import requests
 from flask import Blueprint, jsonify
 
-from config import OPENWEATHER_API_KEY, GROQ_API_KEY
+from config import OPENAQ_API_KEY, GROQ_API_KEY
 from utils.cache import redis_client
 
 debug_bp = Blueprint("debug", __name__)
@@ -47,16 +47,17 @@ def _check_elevation():
     return {"http_status": resp.status_code, "detail": "reachable"}
 
 
-def _check_openweathermap():
-    if not OPENWEATHER_API_KEY:
-        return {"status": "not_configured", "detail": "No OPENWEATHER_API_KEY"}
+def _check_openaq():
+    if not OPENAQ_API_KEY:
+        return {"status": "not_configured", "detail": "No OPENAQ_API_KEY"}
     resp = requests.get(
-        "https://api.openweathermap.org/data/2.5/air_pollution",
-        params={"lat": 0, "lon": 0, "appid": OPENWEATHER_API_KEY},
+        "https://api.openaq.org/v3/locations",
+        headers={"X-API-Key": OPENAQ_API_KEY},
+        params={"limit": 1},
         timeout=5,
     )
-    if resp.status_code == 401:
-        return {"http_status": 401, "detail": "API key invalid or not yet activated"}
+    if resp.status_code == 401 or resp.status_code == 403:
+        return {"http_status": resp.status_code, "detail": "API key invalid or not yet activated"}
     return {"http_status": resp.status_code, "detail": "reachable"}
 
 
@@ -87,7 +88,7 @@ def check_dependencies():
     checks = [
         _check_provider("upstash_redis", _check_redis),
         _check_provider("open_elevation", _check_elevation),
-        _check_provider("openweathermap", _check_openweathermap),
+        _check_provider("openaq", _check_openaq),
         _check_provider("overpass_osm", _check_overpass),
         _check_provider("groq_llm", _check_groq),
     ]
