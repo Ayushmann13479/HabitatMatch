@@ -216,7 +216,6 @@ function ScoreContent() {
                 <span className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
                   <d.Icon size={16} strokeWidth={2} className="text-[var(--hm-primary)]" /> {d.label}
                 </span>
-                </span>
                 <span className="text-sm font-mono font-bold text-[var(--text-primary)]">
                   {score} / {d.max}
                 </span>
