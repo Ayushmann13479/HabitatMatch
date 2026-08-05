@@ -4,6 +4,8 @@ import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getSavedProperties, deleteSavedProperty } from '@/lib/api'
+import { useSavedProperties } from '@/context/SavedPropertiesContext'
+import { Icons } from '@/lib/icons'
 
 /* ── Grade colour helper ─────────────────────────────────────────────────── */
 function gradeConfig(score) {
@@ -92,7 +94,7 @@ function SavedCard({ property, onDelete }) {
         >
           {deleting
             ? <span className="block w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-            : <span className="text-base">🗑️</span>
+            : <Icons.Delete size={16} />
           }
         </button>
       </div>
@@ -137,7 +139,7 @@ function SavedCard({ property, onDelete }) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-      <span className="text-6xl mb-4">🔖</span>
+      <span className="text-6xl mb-4 text-[var(--hm-primary)]"><Icons.Saved size={48} strokeWidth={1.5} /></span>
       <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
         No saved properties yet
       </h2>
@@ -157,37 +159,19 @@ function EmptyState() {
 
 /* ── Page ────────────────────────────────────────────────────────────────── */
 export default function SavedPage() {
-  const { getToken, isLoaded, isSignedIn } = useAuth()
-  const [properties, setProperties] = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState(null)
-
-  useEffect(() => {
-    if (!isLoaded) return          // wait for Clerk session
-    if (!isSignedIn) {
-      setError('Not signed in')
-      setLoading(false)
-      return
-    }
-    const load = async () => {
-      try {
-        const token = await getToken()
-        if (!token) throw new Error('Could not get auth token')
-        const res   = await getSavedProperties(token)
-        setProperties(res.data.data?.properties ?? [])
-      } catch (err) {
-        setError(err.message?.includes('Network Error') ? 'Check your internet connection' : 'Could not load saved properties')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [isLoaded, isSignedIn, getToken])
+  const { getToken } = useAuth()
+  const { savedProperties: properties, isLoading: loading, removeProperty } = useSavedProperties()
+  const [error, setError] = useState(null)
 
   const handleDelete = async (id) => {
-    const token = await getToken()
-    await deleteSavedProperty(id, token)
-    setProperties(prev => prev.filter(p => p.id !== id))
+    try {
+      const token = await getToken()
+      await deleteSavedProperty(id, token)
+      removeProperty(id) // Update global context immediately
+    } catch (err) {
+      console.error('Failed to delete property:', err)
+      // Ideally show a toast here
+    }
   }
 
   return (
@@ -197,7 +181,7 @@ export default function SavedPage() {
         {/* Page header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <span>🔖</span> Saved Properties
+            <Icons.Saved size={24} strokeWidth={2} className="text-[var(--hm-primary)]" /> Saved Properties
           </h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
             {properties.length > 0
@@ -218,7 +202,7 @@ export default function SavedPage() {
         {/* Error */}
         {!loading && error && (
           <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl p-6 text-center">
-            <span className="text-2xl mb-2 block">⚠️</span>
+            <span className="text-2xl mb-2 flex justify-center text-red-500"><Icons.Warning size={32} /></span>
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             <button
               onClick={() => window.location.reload()}

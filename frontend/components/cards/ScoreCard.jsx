@@ -2,6 +2,7 @@
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
 } from 'recharts'
+import { Icons } from '@/lib/icons'
 
 function SkeletonCard() {
   return (
@@ -35,7 +36,7 @@ function SkeletonCard() {
 function ErrorCard({ message, onRetry }) {
   return (
     <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
-      <span className="text-2xl">⚠️</span>
+      <span className="text-red-500 mb-1"><Icons.Warning size={32} /></span>
       <p className="text-sm text-red-600 dark:text-red-400">{message || 'Failed to load score.'}</p>
       {onRetry && (
         <button
@@ -104,7 +105,7 @@ export default function ScoreCard({ data, loading, error, onRetry }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <span className="text-xl">📊</span>
+          <span className="text-[var(--hm-primary)]"><Icons.Chart size={24} /></span>
           <h3 className="text-xl font-bold text-[var(--text-primary)]">HabitatScore</h3>
         </div>
         <div className="flex items-center gap-3">

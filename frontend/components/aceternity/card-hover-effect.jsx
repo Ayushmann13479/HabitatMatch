@@ -29,6 +29,11 @@ export function HoverEffect({ items, className }) {
             )}
           </AnimatePresence>
           <HoverCard>
+            {item.Icon && (
+              <div className="text-primary mb-2">
+                <item.Icon size={24} strokeWidth={1.75} />
+              </div>
+            )}
             <HoverCardTitle>{item.title}</HoverCardTitle>
             <HoverCardDescription>{item.description}</HoverCardDescription>
           </HoverCard>

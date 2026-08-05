@@ -1,4 +1,5 @@
 'use client'
+import { Icons } from '@/lib/icons'
 
 function SkeletonCard() {
   return (
@@ -20,7 +21,7 @@ function SkeletonCard() {
 function ErrorCard({ message, onRetry }) {
   return (
     <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
-      <span className="text-2xl">⚠️</span>
+      <span className="text-red-500"><Icons.Warning size={28} /></span>
       <p className="text-sm text-red-600 dark:text-red-400">{message || 'Failed to load data.'}</p>
       {onRetry && (
         <button
@@ -50,7 +51,7 @@ export default function DisasterCard({ data, loading, error, onRetry }) {
   return (
     <div className="bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-2xl p-5 shadow-sm flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <span className="text-lg">🌊</span>
+        <span className="text-[var(--hm-primary)]"><Icons.Flood size={20} /></span>
         <h3 className="text-base font-semibold text-[var(--text-primary)]">Flood Exposure</h3>
       </div>
 
@@ -81,7 +82,7 @@ export default function DisasterCard({ data, loading, error, onRetry }) {
       {/* Flood zone info line (neutral, not alarming) */}
       {data.in_flood_zone && (
         <div className="flex items-start gap-2 p-2.5 bg-[var(--bg-subtle)] border border-[var(--hm-border)] rounded-xl text-[var(--text-secondary)] text-xs leading-relaxed">
-          <span className="shrink-0 mt-0.5">ℹ️</span>
+          <span className="shrink-0 mt-0.5 text-[var(--text-tertiary)]"><Icons.Info size={14} /></span>
           <span>Low elevation relative to nearby coastline — consider flood insurance and drainage when evaluating this property.</span>
         </div>
       )}

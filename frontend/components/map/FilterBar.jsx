@@ -1,16 +1,18 @@
 'use client'
 
+import { Icons } from '@/lib/icons'
+
 const CATEGORIES = [
-  { key: 'hospital',        emoji: '🏥', label: 'Hospitals' },
-  { key: 'school',          emoji: '🏫', label: 'Schools'   },
-  { key: 'park',            emoji: '🌳', label: 'Parks'     },
-  { key: 'gas_station',     emoji: '⛽', label: 'Petrol'    },
-  { key: 'railway_station', emoji: '🚉', label: 'Railway'   },
-  { key: 'pharmacy',        emoji: '💊', label: 'Pharmacy'  },
-  { key: 'college',         emoji: '🎓', label: 'College'   },
-  { key: 'mall',            emoji: '🛍️', label: 'Mall'      },
-  { key: 'atm',             emoji: '🏦', label: 'ATM'       },
-  { key: 'bank',            emoji: '🏛️', label: 'Bank'      },
+  { key: 'hospital',        Icon: Icons.Hospital, label: 'Hospitals' },
+  { key: 'school',          Icon: Icons.School,   label: 'Schools'   },
+  { key: 'park',            Icon: Icons.Trees,    label: 'Parks'     },
+  { key: 'gas_station',     Icon: Icons.Fuel,     label: 'Petrol'    },
+  { key: 'railway_station', Icon: Icons.Train,    label: 'Railway'   },
+  { key: 'pharmacy',        Icon: Icons.Pharmacy, label: 'Pharmacy'  },
+  { key: 'college',         Icon: Icons.College,  label: 'College'   },
+  { key: 'mall',            Icon: Icons.Mall,     label: 'Mall'      },
+  { key: 'atm',             Icon: Icons.Bank,     label: 'ATM'       },
+  { key: 'bank',            Icon: Icons.Bank,     label: 'Bank'      },
 ]
 
 export default function FilterBar({ activeCategories = [], onToggle, counts = {} }) {
@@ -36,7 +38,7 @@ export default function FilterBar({ activeCategories = [], onToggle, counts = {}
                 }
               `}
             >
-              <span className="text-sm leading-none">{cat.emoji}</span>
+              <span className="flex items-center"><cat.Icon size={14} strokeWidth={2} /></span>
               <span>{cat.label}</span>
               {count != null && (
                 <span className={`

@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import Link from 'next/link'
-import { getSavedProperties } from '@/lib/api'
+import { useSavedProperties } from '@/context/SavedPropertiesContext'
+import { Icons } from '@/lib/icons'
 
 /* ── Grade badge ─────────────────────────────────────────────────────────── */
 function GradeBadge({ score, grade }) {
@@ -76,7 +77,9 @@ function PanelBody({ loading, properties, onSelect, selectedIds, mode }) {
               }`}
             >
               {/* Active checkmark */}
-              <span className={`shrink-0 text-xs ${isActive ? 'text-emerald-600' : 'opacity-0'}`}>✓</span>
+              <span className={`shrink-0 text-xs ${isActive ? 'text-emerald-600' : 'opacity-0'}`}>
+                <Icons.Check size={14} />
+              </span>
 
               {/* Address */}
               <span className="flex-1 text-xs text-[var(--text-primary)] leading-snug line-clamp-2 text-left">
@@ -97,27 +100,8 @@ function PanelBody({ loading, properties, onSelect, selectedIds, mode }) {
 
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function SavedPropertiesPanel({ onSelect, mode = 'compare', selectedIds = [] }) {
-  const { getToken, isLoaded, isSignedIn } = useAuth()
-  const [properties, setProperties] = useState([])
-  const [loading,    setLoading]    = useState(true)
+  const { savedProperties: properties, isLoading: loading } = useSavedProperties()
   const [mobileOpen, setMobileOpen] = useState(false)
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return
-    const load = async () => {
-      try {
-        const token = await getToken()
-        if (!token) return
-        const res   = await getSavedProperties(token)
-        setProperties(res.data.data?.properties ?? [])
-      } catch {
-        setProperties([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [isLoaded, isSignedIn, getToken])
 
   const panelContent = (
     <PanelBody
@@ -136,7 +120,7 @@ export default function SavedPropertiesPanel({ onSelect, mode = 'compare', selec
         <div className="sticky top-20 bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-2xl shadow-sm overflow-hidden">
           <div className="px-3 pt-3.5 pb-2 border-b border-[var(--hm-border)]">
             <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-              <span>🔖</span> Saved Properties
+              <Icons.Saved size={16} strokeWidth={2} /> Saved Properties
             </h3>
           </div>
           {panelContent}
@@ -152,7 +136,7 @@ export default function SavedPropertiesPanel({ onSelect, mode = 'compare', selec
                      text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         >
           <span className="flex items-center gap-1.5">
-            <span>🔖</span> Saved Properties
+            <Icons.Saved size={16} strokeWidth={2} /> Saved Properties
             {!loading && properties.length > 0 && (
               <span className="ml-1 text-xs font-normal text-[var(--text-tertiary)]">
                 ({properties.length})

@@ -2,13 +2,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { Icons } from '@/lib/icons'
 
 const navItems = [
-  { href: '/map',     emoji: '🗺️', label: 'Map' },
-  { href: '/compare', emoji: '⚖️', label: 'Compare' },
-  { href: '/saved',   emoji: '🔖', label: 'Saved' },
-  { href: '/ask',     emoji: '💬', label: 'Ask' },
-  { href: '/about',   emoji: 'ℹ️', label: 'About' },
+  { href: '/map',     Icon: Icons.MapIcon, label: 'Map' },
+  { href: '/compare', Icon: Icons.Scale,   label: 'Compare' },
+  { href: '/saved',   Icon: Icons.Saved,   label: 'Saved' },
+  { href: '/ask',     Icon: Icons.AI,      label: 'Ask' },
+  { href: '/about',   Icon: Icons.Info,    label: 'About' },
 ]
 
 export default function BottomNav() {
@@ -26,7 +27,7 @@ export default function BottomNav() {
               isActive ? 'text-primary' : 'text-muted-foreground'
             )}
           >
-            <span className="text-lg">{item.emoji}</span>
+            <span className="mb-0.5"><item.Icon size={20} strokeWidth={2} /></span>
             <span className="font-medium">{item.label}</span>
           </Link>
         )

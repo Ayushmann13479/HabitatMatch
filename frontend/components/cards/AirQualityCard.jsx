@@ -1,5 +1,6 @@
 'use client'
 import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from 'recharts'
+import { Icons } from '@/lib/icons'
 
 function SkeletonCard() {
   return (
@@ -19,7 +20,7 @@ function SkeletonCard() {
 function ErrorCard({ message, onRetry }) {
   return (
     <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
-      <span className="text-2xl">⚠️</span>
+      <span className="text-red-500"><Icons.Warning size={28} /></span>
       <p className="text-sm text-red-600 dark:text-red-400">{message || 'Failed to load data.'}</p>
       {onRetry && (
         <button
@@ -55,7 +56,7 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🌬️</span>
+          <span className="text-[var(--hm-primary)]"><Icons.AirQuality size={20} /></span>
           <h3 className="text-base font-semibold text-[var(--text-primary)]">Air Quality</h3>
         </div>
         {data.is_fallback && (
@@ -129,7 +130,7 @@ export default function AirQualityCard({ data, loading, error, onRetry }) {
 
       {/* Source */}
       <p className="text-[11px] text-[var(--text-tertiary)] text-center truncate">
-        📡 {data.station_name || 'WAQI'}
+        <span className="inline-flex items-center gap-1"><Icons.Satellite size={12} /> {data.station_name || 'WAQI'}</span>
       </p>
     </div>
   )

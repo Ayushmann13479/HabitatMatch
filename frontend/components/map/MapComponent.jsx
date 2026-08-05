@@ -21,17 +21,24 @@ const RED_MARKER = new L.Icon({
   shadowSize:    [41, 41],
 })
 
-const CATEGORY_EMOJIS = {
-  hospital: '🏥',
-  school: '🏫',
-  park: '🌳',
-  gas_station: '⛽',
-  railway_station: '🚉',
-  pharmacy: '💊',
-  college: '🎓',
-  mall: '🛍️',
-  atm: '🏦',
-  bank: '🏛️'
+// SVG path data from Lucide icons for map markers (raw HTML, not React)
+const CATEGORY_SVG = {
+  hospital:        '<path d="M12 6v4" /><path d="M14 14h-4" /><path d="M14 18h-4" /><path d="M14 8h-4" /><path d="M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2" /><path d="M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18" />',
+  school:          '<path d="M14 22v-4a2 2 0 1 0-4 0v4" /><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2" /><path d="M18 5v17" /><path d="m4 6 8-4 8 4" /><path d="M6 5v17" /><circle cx="12" cy="9" r="2" />',
+  park:            '<path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z" /><path d="M7 16v6" /><path d="M13 19v3" /><path d="M15.7 14.8A2 2 0 0 0 14 13V8a2 2 0 0 1 4 0v5a2 2 0 0 0 .5 1.3L21 17a1 1 0 0 1 0 1.5l-.7.7a1 1 0 0 1-1.4 0Z" />',
+  gas_station:     '<path d="M3 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18" /><path d="M15 22H3" /><path d="M15 10h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 4" /><path d="M7 10h4" />',
+  railway_station: '<path d="M4 11V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7" /><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /><path d="m9 21 3 3 3-3" /><path d="M12 12v3" /><path d="M4 11h16" /><path d="M4 15h16" />',
+  pharmacy:        '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /><path d="m8.5 8.5 7 7" />',
+  college:         '<path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" />',
+  mall:            '<rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" />',
+  atm:             '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2" />',
+  bank:            '<line x1="3" x2="21" y1="22" y2="22" /><line x1="6" x2="6" y1="18" y2="11" /><line x1="10" x2="10" y1="18" y2="11" /><line x1="14" x2="14" y1="18" y2="11" /><line x1="18" x2="18" y1="18" y2="11" /><polygon points="12 2 20 7 4 7" />',
+}
+
+const CATEGORY_COLORS = {
+  hospital: '#EF4444', school: '#3B82F6', park: '#16A34A',
+  gas_station: '#F97316', railway_station: '#8B5CF6', pharmacy: '#EC4899',
+  college: '#6366F1', mall: '#A855F7', atm: '#0EA5E9', bank: '#0D9488',
 }
 
 export default function MapComponent({
@@ -169,7 +176,9 @@ export default function MapComponent({
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
-          map.flyTo([coords.latitude, coords.longitude], 13, { animate: true, duration: 1.2 })
+          if (mapInstanceRef.current === map) {
+            map.flyTo([coords.latitude, coords.longitude], 13, { animate: true, duration: 1.2 })
+          }
         },
         () => { /* denied or unavailable — keep world view */ },
         { timeout: 8000 }
@@ -185,7 +194,7 @@ export default function MapComponent({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Re-render emoji markers when places or activeCategories changes ──
+  // ── Re-render SVG markers when places or activeCategories changes ──
   useEffect(() => {
     if (!mapInstanceRef.current || !placesLayerRef.current) return
 
@@ -194,25 +203,20 @@ export default function MapComponent({
     places.forEach(place => {
       if (!activeCategories.includes(place.category)) return
 
-      const emoji = CATEGORY_EMOJIS[place.category] || '📍'
+      const svgPaths = CATEGORY_SVG[place.category] || '<circle cx="12" cy="10" r="3" /><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 6.9 8 11.7z" />'
+      const color = CATEGORY_COLORS[place.category] || '#16A34A'
 
       const icon = L.divIcon({
-        html: `<span style="
-          font-size: 26px;
-          cursor: pointer;
-          line-height: 1;
-          filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));
-          user-select: none;
-        ">${emoji}</span>`,
+        html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); background: white; border-radius: 50%; padding: 3px;">${svgPaths}</svg>`,
         className: '',
-        iconSize:   [32, 32],
-        iconAnchor: [16, 16],
+        iconSize:   [30, 30],
+        iconAnchor: [15, 15],
       })
 
       let popup = `<b style="font-size:13px">${place.name}</b><br>
         <span style="font-size:12px;color:#6B7280">${place.distance_metres}m away</span>`
       if (place.rating > 0) {
-        popup += `<span style="font-size:12px;color:#6B7280"> &nbsp;·&nbsp; ⭐ ${place.rating}</span>`
+        popup += `<span style="font-size:12px;color:#6B7280"> &nbsp;&middot;&nbsp; ★ ${place.rating}</span>`
       }
 
       L.marker([place.lat, place.lng], { icon })

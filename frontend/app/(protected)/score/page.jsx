@@ -9,14 +9,15 @@ import {
 } from 'recharts'
 import { getScore } from '@/lib/api'
 import Link from 'next/link'
+import { Icons } from '@/lib/icons'
 
 const DIMENSIONS = [
-  { key: 'safety',       label: 'Safety',       emoji: '🛡️', max: 20 },
-  { key: 'connectivity', label: 'Connectivity',  emoji: '🚇', max: 20 },
-  { key: 'amenities',    label: 'Amenities',     emoji: '🏥', max: 20 },
-  { key: 'air_quality',  label: 'Air Quality',   emoji: '🌬️', max: 20 },
-  { key: 'vibe',         label: 'Vibe',          emoji: '✨', max: 10 },
-  { key: 'green_cover',  label: 'Green Cover',   emoji: '🌳', max: 10 },
+  { key: 'safety',       label: 'Safety',       Icon: Icons.Safety,     max: 20 },
+  { key: 'connectivity', label: 'Connectivity',  Icon: Icons.Transit,    max: 20 },
+  { key: 'amenities',    label: 'Amenities',     Icon: Icons.Hospital,   max: 20 },
+  { key: 'air_quality',  label: 'Air Quality',   Icon: Icons.AirQuality, max: 20 },
+  { key: 'vibe',         label: 'Vibe',          Icon: Icons.Sparkles,   max: 10 },
+  { key: 'green_cover',  label: 'Green Cover',   Icon: Icons.Trees,      max: 10 },
 ]
 
 function scoreColor(total) {
@@ -70,7 +71,7 @@ function ScoreContent() {
   if (!lat || !lng || !address) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
-        <span className="text-5xl">🏡</span>
+        <span className="text-primary"><Icons.Home size={48} /></span>
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">No property selected yet.</h2>
         <p className="text-[var(--text-secondary)]">Analyse a location on the Map first, then the score will appear here.</p>
         <Link
@@ -98,7 +99,7 @@ function ScoreContent() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
-        <span className="text-4xl">⚠️</span>
+        <span className="text-red-500"><Icons.Warning size={40} /></span>
         <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
         <Link href="/map" className="text-sm text-[var(--hm-primary)] hover:underline">← Back to Map</Link>
       </div>
@@ -212,8 +213,9 @@ function ScoreContent() {
               className="bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-2xl p-4 shadow-sm"
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold text-[var(--text-primary)]">
-                  {d.emoji} {d.label}
+                <span className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                  <d.Icon size={16} strokeWidth={2} className="text-[var(--hm-primary)]" /> {d.label}
+                </span>
                 </span>
                 <span className="text-sm font-mono font-bold text-[var(--text-primary)]">
                   {score} / {d.max}
@@ -236,7 +238,7 @@ function ScoreContent() {
           href="/compare"
           className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--hm-primary)] transition-colors"
         >
-          ⚖️ Compare with another location →
+          <Icons.Scale size={16} className="shrink-0" /> Compare with another location →
         </Link>
       </div>
     </div>

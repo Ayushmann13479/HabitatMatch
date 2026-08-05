@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { Icons } from '@/lib/icons'
 
 export default function SearchBar({ onLocationSelect }) {
   const [query,   setQuery]   = useState('')
@@ -121,7 +122,7 @@ export default function SearchBar({ onLocationSelect }) {
                          border-b border-gray-100 last:border-0 transition-colors"
               title={result.display_name}
             >
-              <span className="mr-2 text-[var(--hm-primary)] text-base">📍</span>
+              <span className="mr-2 text-[var(--hm-primary)] inline-flex"><Icons.Pin size={16} /></span>
               {result.display_name.length > 62
                 ? result.display_name.substring(0, 62) + '…'
                 : result.display_name

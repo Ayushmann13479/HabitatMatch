@@ -1,4 +1,5 @@
 'use client'
+import { Icons } from '@/lib/icons'
 
 function SkeletonCard() {
   return (
@@ -22,7 +23,7 @@ function SkeletonCard() {
 function ErrorCard({ message, onRetry }) {
   return (
     <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
-      <span className="text-2xl">⚠️</span>
+      <span className="text-red-500"><Icons.Warning size={28} /></span>
       <p className="text-sm text-red-600 dark:text-red-400">{message || 'Failed to load data.'}</p>
       {onRetry && (
         <button onClick={onRetry} className="text-xs font-semibold text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 px-3 py-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
@@ -54,7 +55,7 @@ export default function VibeCard({ data, loading, error, onRetry }) {
     <div className="bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-2xl p-5 shadow-sm flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <span className="text-lg">✨</span>
+        <span className="text-[var(--hm-primary)]"><Icons.Sparkles size={20} /></span>
         <h3 className="text-base font-semibold text-[var(--text-primary)]">Neighbourhood Vibe</h3>
       </div>
 
@@ -95,7 +96,7 @@ export default function VibeCard({ data, loading, error, onRetry }) {
           <ul className="space-y-1.5">
             {(data.pros || []).map((pro, i) => (
               <li key={i} className="text-xs text-[var(--text-secondary)] flex gap-1.5 items-start">
-                <span className="shrink-0 mt-0.5">✅</span>
+                <span className="shrink-0 mt-0.5 text-emerald-500"><Icons.CircleCheck size={14} /></span>
                 <span>{pro}</span>
               </li>
             ))}
@@ -106,7 +107,7 @@ export default function VibeCard({ data, loading, error, onRetry }) {
           <ul className="space-y-1.5">
             {(data.cons || []).map((con, i) => (
               <li key={i} className="text-xs text-[var(--text-secondary)] flex gap-1.5 items-start">
-                <span className="shrink-0 mt-0.5">❌</span>
+                <span className="shrink-0 mt-0.5 text-red-400"><Icons.CircleX size={14} /></span>
                 <span>{con}</span>
               </li>
             ))}

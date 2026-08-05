@@ -3,44 +3,45 @@ import { useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { HoverEffect } from '@/components/aceternity/card-hover-effect'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Icons } from '@/lib/icons'
 
 const features = [
   {
-    title: '🗺️ Interactive Map',
-    description:
-      'Drop a pin anywhere to instantly start your property analysis.',
+    Icon: Icons.MapIcon,
+    title: 'Interactive Map',
+    description: 'Drop a pin anywhere to instantly start your property analysis.',
     link: '/map',
   },
   {
-    title: '🏥 Nearby Amenities',
-    description:
-      'See hospitals, schools, parks, pharmacies, and transit on the map in real time.',
+    Icon: Icons.Hospital,
+    title: 'Nearby Amenities',
+    description: 'See hospitals, schools, parks, pharmacies, and transit on the map in real time.',
     link: '/map',
   },
   {
-    title: '🌊 Risk Analysis',
-    description:
-      'Flood zones, elevation data, and air quality index for any location.',
+    Icon: Icons.Flood,
+    title: 'Risk Analysis',
+    description: 'Flood zones, elevation data, and air quality index for any location.',
     link: '/map',
   },
   {
-    title: '🤖 AI Intelligence',
-    description:
-      'Ask anything about a property. Get honest, data-backed answers.',
+    Icon: Icons.AI,
+    title: 'AI Intelligence',
+    description: 'Ask anything about a property. Get honest, data-backed answers.',
     link: '/ask',
   },
   {
-    title: '📊 HabitatScore',
-    description:
-      'A single score across 6 dimensions — safety, connectivity, vibe, and more. Shown automatically after analysing a property on the Map.',
+    Icon: Icons.Chart,
+    title: 'HabitatScore',
+    description: 'A single score across 6 dimensions — safety, connectivity, vibe, and more. Shown automatically after analysing a property on the Map.',
     link: '/map',
   },
   {
-    title: '⚖️ Compare Areas',
-    description:
-      'Compare two locations side by side with overlaid radar charts.',
+    Icon: Icons.Scale,
+    title: 'Compare Areas',
+    description: 'Compare two locations side by side with overlaid radar charts.',
     link: '/compare',
   },
 ]
@@ -58,7 +59,7 @@ export default function HomePage() {
       {/* Welcome */}
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-          Welcome back{user?.firstName ? `, ${user.firstName}` : ''} 👋
+          Welcome back{user?.firstName ? `, ${user.firstName}` : ''}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           What would you like to analyse today?
@@ -67,12 +68,12 @@ export default function HomePage() {
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-3 mb-10">
-        <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-          <Link href="/map">Open Map →</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/ask">Ask AI</Link>
-        </Button>
+        <Link href="/map" className={buttonVariants({ className: 'bg-primary hover:bg-primary/90 text-primary-foreground' })}>
+          Open Map →
+        </Link>
+        <Link href="/ask" className={buttonVariants({ variant: 'outline' })}>
+          Ask AI
+        </Link>
       </div>
 
       <Separator className="mb-10" />

@@ -8,14 +8,15 @@ import {
 import { getScore } from '@/lib/api'
 import api from '@/lib/api'
 import SavedPropertiesPanel from '@/components/saved/SavedPropertiesPanel'
+import { Icons } from '@/lib/icons'
 
 const DIMENSIONS = [
-  { key: 'safety',       label: 'Safety',      emoji: '🛡️', max: 20 },
-  { key: 'connectivity', label: 'Connectivity', emoji: '🚇', max: 20 },
-  { key: 'amenities',    label: 'Amenities',    emoji: '🏥', max: 20 },
-  { key: 'air_quality',  label: 'Air Quality',  emoji: '🌬️', max: 20 },
-  { key: 'vibe',         label: 'Vibe',         emoji: '✨', max: 10 },
-  { key: 'green_cover',  label: 'Green Cover',  emoji: '🌳', max: 10 },
+  { key: 'safety',       label: 'Safety',      Icon: Icons.Safety, max: 20 },
+  { key: 'connectivity', label: 'Connectivity', Icon: Icons.Transit, max: 20 },
+  { key: 'amenities',    label: 'Amenities',    Icon: Icons.Amenities, max: 20 },
+  { key: 'air_quality',  label: 'Air Quality',  Icon: Icons.AirQuality, max: 20 },
+  { key: 'vibe',         label: 'Vibe',         Icon: Icons.AI, max: 10 },
+  { key: 'green_cover',  label: 'Green Cover',  Icon: Icons.Trees, max: 10 },
 ]
 
 function GradeTag({ grade }) {
@@ -104,7 +105,7 @@ function LocChip({ label, loc, onClear }) {
     <div className="flex items-center gap-1.5 text-xs bg-[var(--bg-subtle)] border border-[var(--hm-border)] rounded-lg px-2.5 py-1.5">
       <span className="font-semibold text-[var(--hm-primary)]">{label}:</span>
       <span className="text-[var(--text-secondary)] truncate max-w-[180px]">{loc.address}</span>
-      <button onClick={onClear} className="ml-1 text-[var(--text-tertiary)] hover:text-red-500 transition-colors">✕</button>
+      <button onClick={onClear} className="ml-1 text-[var(--text-tertiary)] hover:text-red-500 transition-colors flex items-center justify-center p-0.5"><Icons.Close size={14} strokeWidth={2.5} /></button>
     </div>
   )
 }
@@ -246,13 +247,13 @@ export default function ComparePage() {
 
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-600">⚠️ {error}</div>
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-600 flex items-center gap-2"><Icons.Warning size={16} /> {error}</div>
           )}
 
           {/* Empty hint */}
           {!scoreA && !scoreB && !loading && !error && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <span className="text-4xl mb-3">⚖️</span>
+              <span className="text-[var(--hm-primary)] mb-3"><Icons.Chart size={48} strokeWidth={1.5} /></span>
               <p className="text-sm text-[var(--text-secondary)] max-w-sm">
                 Search two locations above or pick from your Saved Properties panel on the right.
               </p>
@@ -275,8 +276,8 @@ export default function ComparePage() {
                     }`}
                   >
                     {isWinner && (
-                      <span className="absolute -top-3 left-4 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                        ✓ Better choice
+                      <span className="absolute -top-3 left-4 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                        <Icons.Check size={12} strokeWidth={3} /> Better choice
                       </span>
                     )}
                     <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
@@ -355,8 +356,8 @@ export default function ComparePage() {
                       key={d.key}
                       className="grid grid-cols-3 px-5 py-3 border-t border-[var(--hm-border)] items-center"
                     >
-                      <span className="text-sm text-[var(--text-primary)] font-medium">
-                        {d.emoji} {d.label}
+                      <span className="text-sm text-[var(--text-primary)] font-medium flex items-center gap-1.5">
+                        <d.Icon size={16} className="text-[var(--text-secondary)]" /> {d.label}
                       </span>
                       <span className={`text-center text-sm font-bold font-mono ${clsA}`}>{sA}</span>
                       <span className={`text-center text-sm font-bold font-mono ${clsB}`}>{sB}</span>
@@ -368,7 +369,7 @@ export default function ComparePage() {
               {/* AI Verdict */}
               {verdict && (
                 <div className="border-l-4 border-emerald-500 bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-r-2xl p-5 shadow-sm">
-                  <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">🤖 AI Verdict</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-1.5"><Icons.AI size={18} strokeWidth={2} /> AI Verdict</p>
                   <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{verdict.reason}</p>
                   {verdict.a_best && verdict.b_best && (
                     <div className="flex gap-4 mt-3 flex-wrap">

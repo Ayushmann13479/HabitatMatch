@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ChatBubble from '@/components/chat/ChatBubble'
 import StarterChips from '@/components/chat/StarterChips'
 import SavedPropertiesPanel from '@/components/saved/SavedPropertiesPanel'
+import { Icons } from '@/lib/icons'
 import { useChat } from '@/hooks/useChat'
 
 /* ─── Typing indicator ─────────────────────────────────────────── */
@@ -117,7 +118,7 @@ function AskContent() {
       <div className="flex gap-6 items-start h-full px-4 md:px-6 py-4">
         {/* Empty state */}
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 py-20">
-          <span className="text-5xl">💬</span>
+          <span className="text-5xl text-[var(--hm-primary)]"><Icons.AI size={64} strokeWidth={1.5} /></span>
           <h2 className="text-xl font-semibold text-[var(--text-primary)]">No property selected</h2>
           <p className="text-sm text-[var(--text-secondary)] max-w-xs">
             Pick a saved property from the panel, or go to the Map and analyse a location first.

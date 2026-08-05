@@ -14,13 +14,14 @@ import {
 } from '@/components/ui/tooltip'
 import ThemeToggle from './ThemeToggle'
 import { cn } from '@/lib/utils'
+import { Icons } from '@/lib/icons'
 
 const navItems = [
-  { href: '/map',     emoji: '🗺️', label: 'Map' },
-  { href: '/score',   emoji: '📊', label: 'Score' },
-  { href: '/compare', emoji: '⚖️', label: 'Compare' },
-  { href: '/ask',     emoji: '💬', label: 'Ask AI' },
-  { href: '/about',   emoji: 'ℹ️', label: 'About' },
+  { href: '/map',     Icon: Icons.MapIcon, label: 'Map' },
+  { href: '/score',   Icon: Icons.Chart,   label: 'Score' },
+  { href: '/compare', Icon: Icons.Scale,   label: 'Compare' },
+  { href: '/ask',     Icon: Icons.AI,      label: 'Ask AI' },
+  { href: '/about',   Icon: Icons.Info,    label: 'About' },
 ]
 
 export default function Sidebar() {
@@ -56,7 +57,7 @@ export default function Sidebar() {
                       isActive && 'text-primary font-medium'
                     )}
                   >
-                    <span>{item.emoji}</span>
+                    <span className="flex items-center"><item.Icon size={18} strokeWidth={2} /></span>
                     <span>{item.label}</span>
                   </Link>
                 </TooltipTrigger>

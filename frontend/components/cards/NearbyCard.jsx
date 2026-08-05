@@ -1,17 +1,5 @@
 'use client'
-
-const CATEGORY_EMOJIS = {
-  hospital:        '🏥',
-  school:          '🏫',
-  park:            '🌳',
-  gas_station:     '⛽',
-  railway_station: '🚉',
-  pharmacy:        '💊',
-  college:         '🎓',
-  mall:            '🛍️',
-  atm:             '🏦',
-  bank:            '🏛️',
-}
+import { Icons, CATEGORY_ICONS } from '@/lib/icons'
 
 const CATEGORY_LABELS = {
   hospital:        'Hospitals',
@@ -47,7 +35,7 @@ function SkeletonCard({ tall }) {
 function ErrorCard({ message, onRetry }) {
   return (
     <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3">
-      <span className="text-2xl">⚠️</span>
+      <span className="text-red-500"><Icons.Warning size={28} /></span>
       <p className="text-sm text-red-600 dark:text-red-400">{message || 'Failed to load data.'}</p>
       {onRetry && (
         <button
@@ -79,20 +67,20 @@ export default function NearbyCard({ data, loading, error, onRetry }) {
   return (
     <div className="bg-[var(--bg-surface)] border border-[var(--hm-border)] rounded-2xl p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-lg">📍</span>
+        <span className="text-[var(--hm-primary)]"><Icons.Pin size={20} /></span>
         <h3 className="text-base font-semibold text-[var(--text-primary)]">What's Nearby</h3>
       </div>
 
       {/* Category grid */}
       <div className="grid grid-cols-5 gap-1.5 mb-4">
-        {Object.entries(CATEGORY_EMOJIS).map(([key, emoji]) => {
+        {Object.entries(CATEGORY_ICONS).map(([key, CatIcon]) => {
           const count = counts[key] ?? 0
           return (
             <div
               key={key}
               className={`flex flex-col items-center gap-0.5 p-1.5 rounded-xl border text-center ${getCountColor(count)}`}
             >
-              <span className="text-base leading-none">{emoji}</span>
+              <CatIcon size={18} strokeWidth={1.75} />
               <span className="text-[10px] font-medium leading-tight">{CATEGORY_LABELS[key]}</span>
               <span className="text-sm font-bold">{count}</span>
             </div>
@@ -107,19 +95,22 @@ export default function NearbyCard({ data, loading, error, onRetry }) {
             Closest
           </p>
           <div className="space-y-1.5">
-            {closest.map((p, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between text-sm py-1.5 border-b border-[var(--hm-border)] last:border-0"
-              >
-                <span className="text-[var(--text-primary)] truncate max-w-[70%]">
-                  {CATEGORY_EMOJIS[p.category] || '📍'} {p.name}
-                </span>
-                <span className="text-[var(--text-secondary)] font-mono text-xs shrink-0 ml-2">
-                  {p.distance_metres}m
-                </span>
-              </div>
-            ))}
+            {closest.map((p, i) => {
+              const CatIcon = CATEGORY_ICONS[p.category] || Icons.Pin
+              return (
+                <div
+                  key={i}
+                  className="flex items-center justify-between text-sm py-1.5 border-b border-[var(--hm-border)] last:border-0"
+                >
+                  <span className="text-[var(--text-primary)] truncate max-w-[70%] flex items-center gap-1.5">
+                    <CatIcon size={14} className="shrink-0 text-[var(--text-secondary)]" /> {p.name}
+                  </span>
+                  <span className="text-[var(--text-secondary)] font-mono text-xs shrink-0 ml-2">
+                    {p.distance_metres}m
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </>
       )}

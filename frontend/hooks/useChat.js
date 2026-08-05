@@ -63,7 +63,7 @@ export function useChat({ lat, lng, address, initialSessionId }) {
     if (!lat || !lng) {
       setMessages(prev => [...prev, {
         role: 'model',
-        content: '❌ No property selected. Please go to the Map and analyse a location first.',
+        content: 'No property selected. Please go to the Map and analyse a location first.',
         timestamp: new Date(),
       }])
       return

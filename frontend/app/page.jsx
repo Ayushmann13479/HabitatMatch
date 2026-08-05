@@ -5,53 +5,54 @@ import { Spotlight } from '@/components/aceternity/spotlight'
 import { TextGenerateEffect } from '@/components/aceternity/text-generate-effect'
 import { HoverBorderGradient } from '@/components/aceternity/hover-border-gradient'
 import ThemeToggle from '@/components/layout/ThemeToggle'
+import { Icons } from '@/lib/icons'
 
 const features = [
   {
-    emoji: '🗺️',
+    Icon: Icons.MapIcon,
     title: 'Interactive Map',
     desc: 'Drop a pin anywhere in the world to get instant neighbourhood intelligence.',
   },
   {
-    emoji: '🏥',
+    Icon: Icons.Hospital,
     title: 'Nearby Amenities',
     desc: 'Hospitals, schools, parks, pharmacies, transit — all within seconds.',
   },
   {
-    emoji: '🌊',
+    Icon: Icons.Flood,
     title: 'Disaster Risk',
     desc: 'Flood zone classification and elevation data for every location.',
   },
   {
-    emoji: '🌬️',
+    Icon: Icons.AirQuality,
     title: 'Air Quality',
     desc: 'Real-time PM2.5, AQI and trend data from the closest monitoring station.',
   },
   {
-    emoji: '🤖',
+    Icon: Icons.AI,
     title: 'AI Neighbourhood Analysis',
     desc: 'AI-generated vibe reports, pros, cons, and a best-for rating.',
   },
   {
-    emoji: '💬',
+    Icon: Icons.Chat,
     title: 'Property Chat',
     desc: 'Ask any question about a property and get honest, data-backed answers.',
   },
   {
-    emoji: '🔖',
+    Icon: Icons.Saved,
     title: 'Save & Compare',
     desc: 'Save properties, compare them side by side with overlaid radar charts.',
   },
 ]
 
 const featureStrip = [
-  { emoji: '🗺️', title: 'Interactive map' },
-  { emoji: '🏥', title: 'Nearby amenities' },
-  { emoji: '🌊', title: 'Disaster risk' },
-  { emoji: '🌬️', title: 'Air quality index' },
-  { emoji: '🤖', title: 'AI neighbourhood analysis' },
-  { emoji: '💬', title: 'Property chat' },
-  { emoji: '🔖', title: 'Save and compare properties' },
+  { Icon: Icons.MapIcon, title: 'Interactive map' },
+  { Icon: Icons.Hospital, title: 'Nearby amenities' },
+  { Icon: Icons.Flood, title: 'Disaster risk' },
+  { Icon: Icons.AirQuality, title: 'Air quality index' },
+  { Icon: Icons.AI, title: 'AI neighbourhood analysis' },
+  { Icon: Icons.Chat, title: 'Property chat' },
+  { Icon: Icons.Saved, title: 'Save and compare properties' },
 ]
 
 const steps = [
@@ -162,7 +163,7 @@ export default function LandingPage() {
         >
           {featureStrip.map((f) => (
             <div key={f.title} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>{f.emoji}</span>
+              <f.Icon size={14} strokeWidth={2} />
               <span>{f.title}</span>
             </div>
           ))}
@@ -197,7 +198,7 @@ export default function LandingPage() {
                 transition={{ delay: i * 0.07, duration: 0.4 }}
                 className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow"
               >
-                <div className="text-2xl mb-3">{f.emoji}</div>
+                <div className="text-primary mb-3"><f.Icon size={28} strokeWidth={1.75} /></div>
                 <h3 className="font-semibold text-foreground text-sm">{f.title}</h3>
                 <p className="text-muted-foreground text-xs mt-1.5 leading-relaxed">{f.desc}</p>
               </motion.div>

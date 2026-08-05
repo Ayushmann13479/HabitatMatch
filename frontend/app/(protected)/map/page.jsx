@@ -13,6 +13,8 @@ import AirQualityCard from '@/components/cards/AirQualityCard'
 import VibeCard from '@/components/cards/VibeCard'
 import ScoreCard from '@/components/cards/ScoreCard'
 import { getNearby, getDisaster, getAirQuality, getVibe, getScore, saveProperty } from '@/lib/api'
+import { useSavedProperties } from '@/context/SavedPropertiesContext'
+import { Icons } from '@/lib/icons'
 
 const MapComponent = dynamic(
   () => import('@/components/map/MapComponent'),
@@ -32,6 +34,7 @@ function MapContent() {
   const { getToken } = useAuth()
   const searchParams = useSearchParams()
   const analysisSectionRef = useRef(null)
+  const { addProperty } = useSavedProperties()
 
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [autoloadDone, setAutoloadDone] = useState(false)
@@ -198,22 +201,33 @@ function MapContent() {
     )
   }
 
-  /* ── Save property ─────────────────────────────────────────────────── */
   const handleSave = async () => {
     if (!selectedLocation || !scoreData || saveState !== 'idle') return
     setSaveState('saving')
     try {
       const token = await getToken()
-      await saveProperty({
+      const newProperty = {
+        id: Date.now().toString(), // Or whatever ID backend returns, ideally we fetch it
         address:        selectedLocation.address,
         lat:            selectedLocation.lat,
         lng:            selectedLocation.lng,
         score_snapshot: scoreData,
-      }, token)
+        saved_at: new Date().toISOString()
+      }
+      
+      const res = await saveProperty(newProperty, token)
+      
+      // Optimistic update using backend returned ID if available
+      if (res.data?.data?.id) {
+        newProperty.id = res.data.data.id
+      }
+      addProperty(newProperty)
+
       setSaveState('saved')
       setSaveToast(true)
       setTimeout(() => setSaveToast(false), 2000)
-    } catch {
+    } catch (error) {
+      console.error('Save failed:', error)
       setSaveState('idle')
     }
   }
@@ -307,7 +321,7 @@ function MapContent() {
                   disabled={isRefreshing}
                   className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  {isRefreshing ? 'Refreshing...' : '🔄 Refresh'}
+                  {isRefreshing ? 'Refreshing...' : <><Icons.Chart size={14} className="mr-1 inline" /> Refresh</>}
                 </Button>
               )}
               <p className="text-sm text-[var(--text-secondary)] truncate max-w-xs md:max-w-lg">
@@ -356,20 +370,20 @@ function MapContent() {
                     : 'bg-[var(--hm-primary)] text-white hover:opacity-90 shadow-sm hover:shadow-md'
                 }`}
               >
-                {saveState === 'saved'  && <span>🔖</span>}
+                {saveState === 'saved'  && <Icons.Saved size={16} strokeWidth={2} />}
                 {saveState === 'saving' && (
                   <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
                 )}
-                {saveState === 'idle'   && <span>🔖</span>}
-                {saveState === 'saved'  ? 'Saved ✓'       : ''}
+                {saveState === 'idle'   && <Icons.Saved size={16} strokeWidth={2} />}
+                {saveState === 'saved'  ? 'Saved'         : ''}
                 {saveState === 'saving' ? 'Saving…'       : ''}
                 {saveState === 'idle'   ? 'Save Property' : ''}
               </button>
 
               {/* Inline toast */}
               {saveToast && (
-                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 animate-fade-in">
-                  ✓ Property saved!
+                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 animate-fade-in flex items-center gap-1">
+                  <Icons.Check size={14} /> Property saved!
                 </span>
               )}
 
