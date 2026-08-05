@@ -20,7 +20,7 @@ export function SavedPropertiesProvider({ children }) {
       return
     }
 
-    setIsLoading(true)
+    if (retryCount === 0) setIsLoading(true)
     try {
       const token = await getToken()
       if (!token) {
@@ -36,19 +36,20 @@ export function SavedPropertiesProvider({ children }) {
       const response = await getSavedProperties(token)
       if (response.data && response.data.success) {
         setSavedProperties(response.data.data?.properties || [])
+        setIsLoading(false)
       } else {
         throw new Error(response.data?.error || 'Failed to fetch saved properties')
       }
     } catch (error) {
       console.error('[SavedPropertiesContext] Fetch failed:', error)
-      // Retry once on network/timeout errors (Render cold start)
-      if (retryCount < 1 && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.response?.status >= 500)) {
-        console.log('[SavedPropertiesContext] Retrying after cold start...')
-        setTimeout(() => fetchProperties(retryCount + 1), 3000)
+      // Retry up to 2 times on network/timeout errors (Render cold start)
+      if (retryCount < 2 && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.response?.status >= 500)) {
+        const delay = retryCount === 0 ? 1500 : 5000;
+        console.log(`[SavedPropertiesContext] Retrying after cold start (attempt ${retryCount + 1})...`)
+        setTimeout(() => fetchProperties(retryCount + 1), delay)
         return
       }
       toast.error('Could not load saved properties')
-    } finally {
       setIsLoading(false)
     }
   }, [getToken, isLoaded, isSignedIn])

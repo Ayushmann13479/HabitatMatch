@@ -229,6 +229,8 @@ function MapContent() {
     } catch (error) {
       console.error('Save failed:', error)
       setSaveState('idle')
+      // Important: don't fail silently if the network request drops or backend cold-starts
+      import('sonner').then(({ toast }) => toast.error('Could not save property — please try again'))
     }
   }
 
