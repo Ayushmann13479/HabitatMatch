@@ -12,19 +12,27 @@ export function SavedPropertiesProvider({ children }) {
   const [savedProperties, setSavedProperties] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const fetchProperties = useCallback(async () => {
+  const fetchProperties = useCallback(async (retryCount = 0) => {
     if (!isLoaded) return
     if (!isSignedIn) {
       setSavedProperties([])
       setIsLoading(false)
       return
     }
-    
+
     setIsLoading(true)
     try {
       const token = await getToken()
-      if (!token) throw new Error('No auth token available')
-      
+      if (!token) {
+        // Clerk might still be hydrating — retry once after a short delay
+        if (retryCount < 1) {
+          console.log('[SavedPropertiesContext] Token null, retrying in 1.5s...')
+          setTimeout(() => fetchProperties(retryCount + 1), 1500)
+          return
+        }
+        throw new Error('No auth token available')
+      }
+
       const response = await getSavedProperties(token)
       if (response.data && response.data.success) {
         setSavedProperties(response.data.data?.properties || [])
@@ -33,6 +41,12 @@ export function SavedPropertiesProvider({ children }) {
       }
     } catch (error) {
       console.error('[SavedPropertiesContext] Fetch failed:', error)
+      // Retry once on network/timeout errors (Render cold start)
+      if (retryCount < 1 && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.response?.status >= 500)) {
+        console.log('[SavedPropertiesContext] Retrying after cold start...')
+        setTimeout(() => fetchProperties(retryCount + 1), 3000)
+        return
+      }
       toast.error('Could not load saved properties')
     } finally {
       setIsLoading(false)
