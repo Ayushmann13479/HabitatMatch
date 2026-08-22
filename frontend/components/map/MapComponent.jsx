@@ -114,22 +114,35 @@ export default function MapComponent({
       let address = `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
 
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 4000)
-
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=18&addressdetails=1&accept-language=en`,
-          {
-            headers: { 'Accept-Language': 'en' },
-            signal: controller.signal,
-          }
-        ).catch(() => null)
-        clearTimeout(timeoutId)
-
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+        const res = await fetch(`${backendUrl}/api/geocode/reverse?lat=${lat}&lng=${lng}`).catch(() => null)
+        
         if (res && res.ok) {
-          const data = await res.json().catch(() => null)
-          if (data && data.display_name) {
-            address = data.display_name
+          const body = await res.json().catch(() => null)
+          if (body && body.success && body.data && body.data.address) {
+            address = body.data.address
+          }
+        }
+
+        // Direct Photon fallback if backend was unavailable or returned coordinates fallback
+        if (address.startsWith('Location (')) {
+          const photonRes = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`).catch(() => null)
+          if (photonRes && photonRes.ok) {
+            const pData = await photonRes.json().catch(() => null)
+            const feature = pData?.features?.[0]?.properties
+            if (feature) {
+              const parts = [
+                feature.name,
+                feature.street,
+                feature.district || feature.suburb,
+                feature.city || feature.town || feature.county,
+                feature.state,
+                feature.country
+              ].filter(Boolean)
+              if (parts.length > 0) {
+                address = parts.join(', ')
+              }
+            }
           }
         }
       } catch (err) {
