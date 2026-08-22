@@ -111,63 +111,76 @@ export default function MapComponent({
       // Show a temporary loading popup
       marker.bindPopup('<p style="font-size:13px;color:#555">Fetching address…</p>').openPopup()
 
+      let address = `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+
       try {
-        const res  = await fetch(
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 4000)
+
+        const res = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=18&addressdetails=1&accept-language=en`,
-          { headers: { 'Accept-Language': 'en' } }
-        )
-        const data    = await res.json()
-        const address = data.display_name || 'Unknown Location'
-
-        const popupHtml = `
-          <div style="
-            font-family: Inter, sans-serif;
-            min-width: 210px;
-            max-width: 260px;
-            padding: 4px 0;
-          ">
-            <p style="
-              margin: 0 0 10px 0;
-              font-size: 12px;
-              color: #4B5563;
-              line-height: 1.5;
-            ">${address}</p>
-            <button
-              id="analyse-btn"
-              style="
-                width: 100%;
-                background: #16A34A;
-                color: #fff;
-                border: none;
-                padding: 8px 14px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 13px;
-                font-weight: 600;
-                letter-spacing: 0.01em;
-              "
-              onmouseover="this.style.background='#15803D'"
-              onmouseout="this.style.background='#16A34A'"
-            >
-              Analyse This Location →
-            </button>
-          </div>
-        `
-
-        marker.setPopupContent(popupHtml)
-        marker.openPopup()
-
-        // Bind button click after popup DOM renders
-        setTimeout(() => {
-          const btn = document.getElementById('analyse-btn')
-          if (btn) {
-            btn.onclick = () => onLocationSelect(lat, lng, address)
+          {
+            headers: { 'Accept-Language': 'en' },
+            signal: controller.signal,
           }
-        }, 0)
+        ).catch(() => null)
+        clearTimeout(timeoutId)
+
+        if (res && res.ok) {
+          const data = await res.json().catch(() => null)
+          if (data && data.display_name) {
+            address = data.display_name
+          }
+        }
       } catch (err) {
-        console.error('Reverse geocoding failed:', err)
-        marker.setPopupContent('<p style="font-size:12px;color:#EF4444">Could not fetch address.</p>')
+        // Fallback address is already assigned
       }
+
+      const popupHtml = `
+        <div style="
+          font-family: Inter, sans-serif;
+          min-width: 210px;
+          max-width: 260px;
+          padding: 4px 0;
+        ">
+          <p style="
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            color: #4B5563;
+            line-height: 1.5;
+          ">${address}</p>
+          <button
+            id="analyse-btn"
+            style="
+              width: 100%;
+              background: #16A34A;
+              color: #fff;
+              border: none;
+              padding: 8px 14px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 13px;
+              font-weight: 600;
+              letter-spacing: 0.01em;
+            "
+            onmouseover="this.style.background='#15803D'"
+            onmouseout="this.style.background='#16A34A'"
+          >
+            Analyse This Location →
+          </button>
+        </div>
+      `
+
+      marker.setPopupContent(popupHtml)
+      marker.openPopup()
+
+      // Bind button click after popup DOM renders
+      setTimeout(() => {
+        const btn = document.getElementById('analyse-btn')
+        if (btn) {
+          btn.onclick = () => onLocationSelect(lat, lng, address)
+        }
+      }, 0)
     })
 
     mapInstanceRef.current = map

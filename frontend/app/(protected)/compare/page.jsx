@@ -50,9 +50,14 @@ function LocationSearch({ label, placeholder, value, onSelect }) {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,
           { headers: { 'Accept-Language': 'en' } }
-        )
-        setResults(await res.json())
-        setOpen(true)
+        ).catch(() => null)
+        if (res && res.ok) {
+          const data = await res.json().catch(() => [])
+          setResults(Array.isArray(data) ? data : [])
+          setOpen(Array.isArray(data) && data.length > 0)
+        } else {
+          setResults([])
+        }
       } catch {
         setResults([])
       }

@@ -45,12 +45,18 @@ export default function SearchBar({ onLocationSelect }) {
         const url =
           `https://nominatim.openstreetmap.org/search` +
           `?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1&accept-language=en`
-        const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } })
-        const data = await res.json()
-        setResults(data)
-        setIsOpen(data.length > 0)
+        const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } }).catch(() => null)
+        if (res && res.ok) {
+          const data = await res.json().catch(() => [])
+          setResults(Array.isArray(data) ? data : [])
+          setIsOpen(Array.isArray(data) && data.length > 0)
+        } else {
+          setResults([])
+          setIsOpen(false)
+        }
       } catch {
         setResults([])
+        setIsOpen(false)
       }
     }, 400)
 
