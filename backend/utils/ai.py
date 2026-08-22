@@ -25,19 +25,15 @@ logging.basicConfig(
 
 # ── Initialise Groq ──────────────────────────────────────────────────────────
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "qwen/qwen3.6-27b"
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 def _sanitize_json_text(raw: str) -> str:
-    """Strip markdown fences AND control characters that break json.loads().
-
-    Groq's LLM occasionally emits literal newlines/tabs inside JSON string
-    values (e.g. in a 'pros' list).  These are invalid per RFC 8259 §7 and
-    cause json.JSONDecodeError.  We replace all C0 control chars (U+0000 –
-    U+001F) with a space before parsing.
+    """Strip think tags, markdown fences AND control characters that break json.loads().
     """
-    text = re.sub(r"```json\s*", "", raw)
+    text = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
+    text = re.sub(r"```json\s*", "", text)
     text = re.sub(r"```\s*", "", text)
     text = re.sub(r'[\x00-\x1f]+', ' ', text)
     return text.strip()
@@ -80,9 +76,9 @@ def generate_json(prompt: str, retry: bool = True):
                 messages=[{"role": "user", "content": full_prompt}],
                 response_format={"type": "json_object"},
                 temperature=0.1,
-                max_tokens=600,
+                max_tokens=1200,
                 stream=False,
-                timeout=15,
+                timeout=20,
             )
             raw_text = response.choices[0].message.content
             cleaned = _sanitize_json_text(raw_text)
@@ -169,11 +165,12 @@ def chat_with_context(
                 model=MODEL,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=300,
+                max_tokens=1500,
                 stream=False,
-                timeout=15,
+                timeout=20,
             )
-            reply = response.choices[0].message.content.strip()
+            reply = response.choices[0].message.content or ""
+            reply = re.sub(r'<think>.*?</think>', '', reply, flags=re.DOTALL).strip()
             logger.info("[AI] chat attempt %d/2 — success (%d chars)", attempt, len(reply))
             return reply, None
         except Exception as e:

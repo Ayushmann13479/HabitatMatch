@@ -18,9 +18,8 @@ nearby_bp = Blueprint("nearby", __name__)
 
 # ── Overpass mirror list (tried in order — fastest first) ────────────────────
 OVERPASS_MIRRORS = [
-    ("https://overpass.kumi.systems/api/interpreter", 10),
-    ("https://maps.mail.ru/osm/tools/overpass/api/interpreter", 8),
-    ("https://overpass-api.de/api/interpreter", 8),
+    ("https://overpass-api.de/api/interpreter", 3),
+    ("https://lz4.overpass-api.de/api/interpreter", 3),
 ]
 
 ALL_CATEGORY_NAMES = [
@@ -79,6 +78,61 @@ def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return R * 2 * math.asin(math.sqrt(max(0, a)))
 
 
+def _fetch_nominatim_fallback(lat: float, lng: float, radius: int) -> list:
+    """
+    Fallback method querying Nominatim search endpoint for nearby features.
+    """
+    print("[OVERPASS] Fallback: querying Nominatim with viewbox...")
+    fallback_places = []
+    
+    deg_limit = max(0.02, radius / 111000.0 * 2.0)
+    viewbox = f"{lng - deg_limit},{lat + deg_limit},{lng + deg_limit},{lat - deg_limit}"
+
+    categories_to_query = {
+        "hospital": "hospital",
+        "school": "school",
+        "college": "college",
+        "park": "park",
+        "gas_station": "fuel",
+        "railway_station": "station",
+        "pharmacy": "pharmacy",
+        "mall": "mall",
+        "atm": "atm",
+        "bank": "bank"
+    }
+
+    headers = {"User-Agent": "HabitatMatch/1.0 (property intelligence app)"}
+
+    for category, q in categories_to_query.items():
+        try:
+            url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&viewbox={viewbox}&bounded=1&limit=5"
+            resp = requests.get(url, headers=headers, timeout=4)
+            if resp.status_code == 200:
+                results = resp.json()
+                for item in results:
+                    try:
+                        p_lat = float(item["lat"])
+                        p_lng = float(item["lon"])
+                        dist = _haversine_m(lat, lng, p_lat, p_lng)
+                        fallback_places.append({
+                            "name": item.get("display_name", "").split(",")[0] or category.capitalize(),
+                            "category": category,
+                            "lat": p_lat,
+                            "lng": p_lng,
+                            "distance_metres": int(dist),
+                            "vicinity": item.get("display_name", ""),
+                            "rating": 0.0,
+                        })
+                    except (ValueError, KeyError):
+                        continue
+        except Exception as e:
+            print(f"[OVERPASS] Fallback failed for category {category}: {e}")
+            continue
+
+    print(f"[OVERPASS] Fallback complete. Found {len(fallback_places)} places.")
+    return fallback_places
+
+
 def _fetch_overpass(lat: float, lng: float, radius: int) -> list | None:
     """
     Query Overpass API with mirror fallback.
@@ -89,9 +143,9 @@ def _fetch_overpass(lat: float, lng: float, radius: int) -> list | None:
     for mirror_url, mirror_timeout in OVERPASS_MIRRORS:
         try:
             print(f"[OVERPASS] Trying {mirror_url} (timeout={mirror_timeout}s)")
-            resp = requests.post(
+            resp = requests.get(
                 mirror_url,
-                data={"data": query},
+                params={"data": query},
                 timeout=mirror_timeout,
                 headers={"User-Agent": "HabitatMatch/1.0 (property intelligence app)"},
             )
@@ -103,13 +157,16 @@ def _fetch_overpass(lat: float, lng: float, radius: int) -> list | None:
                 print(f"[OVERPASS] {resp.status_code} from {mirror_url}, trying next")
                 continue
             elements = resp.json().get("elements", [])
-            print(f"[OVERPASS] Success from {mirror_url}: {len(elements)} elements")
-            break  # success
+            if len(elements) > 0:
+                print(f"[OVERPASS] Success from {mirror_url}: {len(elements)} elements")
+                break  # success with real data
+            print(f"[OVERPASS] 0 elements from {mirror_url}, trying next")
+            continue
         except Exception as e:
             print(f"[OVERPASS] Failed on {mirror_url}: {type(e).__name__}")
             continue
     else:
-        return []  # all mirrors failed or timed out, return empty list so it gracefully continues
+        return _fetch_nominatim_fallback(lat, lng, radius)
 
     places = []
     for el in elements:
