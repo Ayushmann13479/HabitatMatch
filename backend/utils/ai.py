@@ -25,7 +25,7 @@ logging.basicConfig(
 
 # ── Initialise Groq ──────────────────────────────────────────────────────────
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-MODEL = "qwen/qwen3.6-27b"
+MODEL = "qwen/qwen3.8-27b"
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
