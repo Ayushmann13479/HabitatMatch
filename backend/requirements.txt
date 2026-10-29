@@ -3,9 +3,10 @@ python-dotenv
 groq
 flask-cors
 flask-compress==1.14
-flask-sqlalchemy
-psycopg2-binary
+flask-sqlalchemy==3.1.1
+psycopg2-binary==2.9.9
 upstash-redis
 requests
 gunicorn
 clerk-backend-api
+sqlalchemy==2.0.36
