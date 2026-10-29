@@ -1,6 +1,6 @@
 flask
 python-dotenv
-groq==1.5.0
+groq
 flask-cors
 flask-compress==1.14
 flask-sqlalchemy

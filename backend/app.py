@@ -16,6 +16,21 @@ from flask_cors import CORS
 from flask_compress import Compress
 
 import config
+
+# ── Startup env-var check ─────────────────────────────────────────────────────
+_REQUIRED_VARS = {
+    "DATABASE_URL":             config.DATABASE_URL,
+    "UPSTASH_REDIS_REST_URL":   config.UPSTASH_REDIS_REST_URL,
+    "UPSTASH_REDIS_REST_TOKEN": config.UPSTASH_REDIS_REST_TOKEN,
+    "CLERK_SECRET_KEY":         config.CLERK_SECRET_KEY,
+    "GROQ_API_KEY":             config.GROQ_API_KEY,
+}
+_missing = [k for k, v in _REQUIRED_VARS.items() if not v]
+if _missing:
+    logging.warning("[STARTUP] Missing env vars: %s — some features will be degraded", _missing)
+else:
+    logging.info("[STARTUP] All required env vars present")
+
 from models import db  # db instance defined in models.py
 
 # ── App initialisation ────────────────────────────────────────────────────────
